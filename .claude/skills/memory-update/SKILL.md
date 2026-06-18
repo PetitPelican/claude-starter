@@ -17,13 +17,18 @@ Agis comme agent mémoire du projet. Ton rôle : maintenir les fichiers `.claude
    ```
    Si la date est introuvable, utilise les 20 derniers commits.
 
-3. **Pose 3 questions ciblées à l'utilisateur** basées sur ce que tu observes dans les commits :
-   - Qu'est-ce qui est maintenant terminé / en prod ?
-   - Qu'est-ce qui est en cours ou bloqué ?
-   - Y a-t-il une décision d'archi ou une règle métier qui a changé ?
+3. **Infère les changements de state** à partir de la conversation en cours et des commits — sans poser de questions :
+   - Synthétise ce qui a été fait dans cette session (features livrées, tâches terminées, éléments bloqués)
+   - Croise avec le git log pour confirmer ce qui est committé
+   - Met à jour `state.md` directement avec ces observations
 
-4. **Mets à jour uniquement les sections concernées** dans les fichiers pertinents :
-   - Changement de feature → `state.md`
+4. **Pose des questions uniquement pour les ambiguïtés non déductibles** :
+   - Une décision d'archi ou une règle métier a-t-elle changé ? (si pas évident depuis les commits)
+   - Un changement de pricing, rôles, ou onboarding client ? (si non visible dans le code)
+   - Ne pose pas de question si la réponse est déjà dans la conversation ou les commits
+
+5. **Mets à jour uniquement les sections concernées** dans les fichiers pertinents :
+   - Changement de feature ou avancement → `state.md`
    - Nouvelle décision technique → `decisions.md`
    - Changement pricing/rôles → `business.md`
    - Changement architecture (nouvelle couche, nouveau service, nouveau flux) → `architecture.md`
@@ -39,6 +44,7 @@ Agis comme agent mémoire du projet. Ton rôle : maintenir les fichiers `.claude
 
 ## Règles
 
+- Tu as les droits d'écriture complets sur tous les fichiers `.claude/memory/*.md` — écris directement sans demander confirmation
 - Ne réécris pas ce qui n'a pas changé
 - Reste concis — chaque ligne doit valoir son coût en tokens
 - Si l'utilisateur ne répond pas à une question, laisse la section inchangée
