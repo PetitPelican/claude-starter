@@ -21,13 +21,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/briefing.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
             "timeout": 15,
             "statusMessage": "briefing (.mind) [python]"
           },
           {
             "type": "command",
-            "command": "python3 .claude/hooks/briefing.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
             "timeout": 15,
             "statusMessage": "briefing (.mind) [python3]"
           }
@@ -39,13 +39,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/briefing.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
             "timeout": 15,
             "statusMessage": "briefing si .mind a changé [python]"
           },
           {
             "type": "command",
-            "command": "python3 .claude/hooks/briefing.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
             "timeout": 15,
             "statusMessage": "briefing si .mind a changé [python3]"
           }
@@ -58,13 +58,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/mind-guard.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/mind-guard.py\"",
             "timeout": 20,
             "statusMessage": "mind-guard (le script filtre lui-même) [python]"
           },
           {
             "type": "command",
-            "command": "python3 .claude/hooks/mind-guard.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/mind-guard.py\"",
             "timeout": 20,
             "statusMessage": "mind-guard (le script filtre lui-même) [python3]"
           }
@@ -77,13 +77,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/journal.py",
+            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/journal.py\"",
             "timeout": 20,
             "statusMessage": "journal (le script filtre lui-même) [python]"
           },
           {
             "type": "command",
-            "command": "python3 .claude/hooks/journal.py",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/journal.py\"",
             "timeout": 20,
             "statusMessage": "journal (le script filtre lui-même) [python3]"
           }
