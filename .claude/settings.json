@@ -65,6 +65,18 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/attente.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/attente.py\"",
+            "timeout": 40,
+            "statusMessage": "attente (ce qui revient à Maxime)"
+          }
+        ]
+      }
     ]
   }
 }

@@ -14,8 +14,14 @@ Deux changements, et chacun corrige une panne réelle :
 2. IL NE SUFFIT PLUS DE « TOUCHER » LA MÉMOIRE. `memory-guard` acceptait
    n'importe quel fichier de `.memory/` : un commit qui ne modifiait que
    `decisions.md` le satisfaisait en laissant `state.md` périmé. Ici on exige
-   les deux fichiers que le collecteur lit vraiment — `.mind/state.md` et
-   `.mind/todo.md` — et on vérifie qu'ils **parsent encore**.
+   `.mind/state.md`, et on vérifie qu'il **parse encore**.
+
+3. LE TODO A QUITTÉ CE HOOK (06/09/2026). `.mind/todo.md` était exigé ici lui
+   aussi ; il appartient désormais à `attente.py`, hook `Stop`, qui se
+   déclenche à chaque fin de tour. Sur `commit`, un agent qui analyse ou qui
+   est bloqué maintenant n'écrivait rien : ce qui attend Maxime n'arrivait
+   qu'au prochain commit, parfois jamais. Un instantané (`state.md`) se pose
+   à un jalon, une alerte (`todo.md`) ne peut pas attendre le jalon suivant.
 
 Le second point est le plus important : un en-tête cassé est PIRE qu'un en-tête
 vieux. `claude-projets` signale « aucun en-tête dans .mind/state.md — on ne sait
@@ -26,8 +32,8 @@ silence se lit comme une absence de problème.
 Contrat repris **du parseur**, pas de mémoire (`claude-projets`, v. 03/09/2026) :
   - en-tête : `---\n…\n---` en tête de `.mind/state.md`, YAML plat
   - champs lus : maj, cap, sante, jalon, balle, depuis, attente, suivant
-  - une tâche : `- [ ] Libellé`, avec ` |x|X|>|~` comme états
-  - marqueurs optionnels : !haut|!moyen|!bas et @<qui>, dont @dehors réservé
+  (le dialecte des tâches — `- [ ] Libellé`, `!haut`, `@maxime` — est passé
+  avec le todo dans `attente.py`.)
 
 Échappatoire : ` # mind-ok` à la fin de la commande.
 **fail-open** : toute erreur, ambiguïté ou dépôt non git laisse passer.
@@ -52,7 +58,6 @@ SRC_DIRS = ("src/", "app/", "lib/", "python/", "sql/", "packages/", "services/",
 # ferait échouer tout commit d'un projet correctement migré.
 CHAMPS_REQUIS = ("maj", "cap", "jalon")
 CHAMPS_REQUIS_FACT = ("maj", "sante", "jalon")
-TACHE = re.compile(r"^\s*[-*]\s*\[( |x|X|>|~)\]\s+(.+?)\s*$")
 
 
 def _git(args):
@@ -182,12 +187,19 @@ def verifie_state(texte, champs=CHAMPS_REQUIS):
     return maux
 
 
-def verifie_todo(texte):
-    if not any(TACHE.match(l) for l in texte.splitlines()):
-        return [("structure",
-                 "il ne contient plus aucune tâche lisible — une tâche s'écrit "
-                 "`- [ ] Libellé`, avec `[>]` en cours et `[x]` fait")]
-    return []
+# `verifie_todo` A ÉTÉ RETIRÉ LE 06/09/2026 — et avec lui toute exigence sur
+# `.mind/todo.md` à cet endroit. Le todo est passé au hook `Stop` (`attente.py`),
+# qui se déclenche à CHAQUE FIN DE TOUR. La raison est mesurée : ce hook-ci ne
+# s'arme que sur `git commit`, donc un agent qui analyse, qui est bloqué
+# maintenant, ou qui n'a pas encore commité n'écrivait rien. Le todo était un
+# journal rétrospectif alors qu'on lui demandait d'être une alerte.
+#
+# Ce hook garde `state.md` : c'est un INSTANTANÉ, et un instantané n'a de sens
+# qu'à un jalon — le commit en est un. Le partage est donc net :
+#
+#     mind-guard (commit)  ->  .mind/state.md   où en est le projet
+#     attente    (Stop)    ->  .mind/todo.md    ce qui attend Maxime
+#     journal    (commit)  ->  .logs/<jour>.md  ce qui a été fait
 
 
 def main():
@@ -240,8 +252,7 @@ def main():
         allow()
 
     # 1. LISIBILITÉ — vaut même sans code, un fichier cassé est le pire cas.
-    for nom, verif in ((state, lambda x: verifie_state(x, champs)),
-                       (todo, verifie_todo)):
+    for nom, verif in ((state, lambda x: verifie_state(x, champs)),):
         if nom in fichiers:
             texte = stage(nom)
             if texte is None:
@@ -273,18 +284,18 @@ def main():
                  "l'en-tête `---` avec `cap:`, puis recommite (` # fact-ok`, "
                  "c'est `.fact/`)." % faits)
 
-    absents = [n for n in (state, todo) if n not in fichiers]
-    if absents:
+    if state not in fichiers:
         echantillon = ", ".join(code[:5]) + (", …" if len(code) > 5 else "")
         deny(
-            "mind-guard : du code projet est indexé (%s) sans mise à jour de %s. "
-            "Ces deux fichiers sont ce que le tableau de bord lit pour savoir où "
-            "en est ce projet et ce qui attend une décision — pas poussés, mais lus "
-            "sur le disque : un commit qui les laisse en arrière rend le projet muet. "
-            "Mets `%s` (dont le champ `maj:`) et `%s` à "
-            "jour, indexe-les, puis recommite. Si la déclaration n'a vraiment pas "
-            "à bouger, ajoute ` # mind-ok` à la fin de la commande."
-            % (echantillon, " et ".join("`%s`" % a for a in absents), state, todo)
+            "mind-guard : du code projet est indexé (%s) sans mise à jour de "
+            "`%s`. C'est ce que le tableau de bord lit pour savoir où en est ce "
+            "projet — pas poussé, mais lu sur le disque : un commit qui le laisse "
+            "en arrière rend le projet muet. Mets-le à jour (dont le champ "
+            "`maj:`), indexe-le (`git add %s`), puis recommite. Si la déclaration "
+            "n'a vraiment pas à bouger, ajoute ` # mind-ok` à la fin de la "
+            "commande.\n\n`.mind/todo.md` n'est plus exigé ICI — c'est le hook "
+            "`Stop` qui le réclame, à chaque fin de tour."
+            % (echantillon, state, state)
         )
     allow()
 
