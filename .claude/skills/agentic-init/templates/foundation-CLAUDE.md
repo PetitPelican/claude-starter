@@ -235,7 +235,7 @@ le pose à la place du hook, et il remonte à la racine par `git rev-parse`.
 **Les hooks sont copiés, mais leur câblage vit dans `settings.json`, qui
 appartient au projet.** Après toute mise à jour, vérifier qu'ils y sont
 déclarés — chacun **deux fois**, une entrée `python` et une `python3`, pour
-couvrir Windows et macOS. Un hook qui ne démarre pas ne bloque rien **et ne le
+couvrir Windows et macOS. Un hook non câblé ne fait rien **et ne le
 dit pas**.
 
 ---

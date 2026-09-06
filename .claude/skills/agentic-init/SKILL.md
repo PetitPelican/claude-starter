@@ -89,8 +89,17 @@ Le script pose des fichiers. Il ne décide rien. Trois choses lui échappent :
 **Le câblage des hooks.** Le harnais copie `mind-guard.py` et `journal.py`, mais
 le bloc `hooks` de `settings.json` appartient au projet. Vérifier qu'ils y sont
 déclarés, chacun **deux fois** — une entrée `python`, une `python3` — pour
-couvrir Windows et macOS sans opérateur de shell. **Un hook qui ne démarre pas
-ne bloque rien et ne le dit pas.**
+couvrir Windows et macOS sans opérateur de shell.
+
+**Deux pannes de hook, opposées, à ne pas confondre.** Un hook **non câblé** ne
+fait rien et ne le dit pas — c'est le silence qu'on cherche à éviter ici. Mais
+un hook **câblé qui ne DÉMARRE pas** (mauvais chemin, interpréteur absent) fait
+l'inverse : en `PostToolUse` il se tait, en `PreToolUse` il **bloque tous les
+appels** de l'outil, et en `UserPromptSubmit` il **jette le message de
+l'utilisateur** — l'agent devient muet, sans qu'aucune erreur ne dise pourquoi.
+Mesuré le 06/09/2026 sur le CTO, qui n'a plus répondu pendant une demi-heure.
+C'est pour ça que les commandes s'ancrent sur `${CLAUDE_PROJECT_DIR:-.}` et
+jamais sur le cwd.
 
 **La preuve.** Faire un commit d'essai de code sans toucher `.mind/`, voir
 `mind-guard` refuser, puis vérifier que `.logs/<jour>.md` s'écrit. Un hook qu'on

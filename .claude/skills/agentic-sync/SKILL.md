@@ -107,7 +107,7 @@ sans l'écraser, et supprime les chemins obsolètes ou renommés. Il ne crée pa
 
 Le script a mis à jour les **scripts** des hooks. Il n'a pas touché à
 `settings.json`, qui est project-owned : un hook fraîchement copié peut n'être
-branché nulle part. **Un hook qui ne démarre pas ne bloque rien et ne le dit
+branché nulle part. **Un hook non câblé ne fait rien et ne le dit
 pas** — c'est exactement ce qui est arrivé à `memory-guard`, déclaré `python` et
 silencieux pendant des mois sur une machine où seul `python3` existe.
 

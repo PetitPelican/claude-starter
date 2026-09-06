@@ -268,7 +268,8 @@ def main():
 
     # 3. settings.json : le CÂBLAGE des hooks est project-owned. S'il existe
     #    déjà, un hook posé en 2. peut n'être branché nulle part — et un hook
-    #    qui ne démarre pas ne bloque rien et ne le dit pas.
+    #    qui n'est pas câblé ne fait rien et ne le dit pas. (Un hook câblé qui
+    #    ne DÉMARRE pas, lui, fait l'inverse : il bloque — voir agentic-init.)
     reglages = projet / ".claude" / "settings.json"
     if not pose_reglages(template / ".claude" / "settings.json", reglages,
                          rap, a.apply):

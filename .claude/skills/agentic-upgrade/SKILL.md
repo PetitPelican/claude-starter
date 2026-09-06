@@ -106,7 +106,7 @@ du tableau **sans bruit**.
 
 Les hooks ont été **copiés**, mais un projet qui avait déjà un `settings.json`
 garde le sien : les hooks y sont peut-être branchés nulle part. Un hook qui ne
-démarre pas ne bloque rien **et ne le dit pas**. Recopier le bloc `hooks` du
+est pas câblé ne fait rien **et ne le dit pas**. Recopier le bloc `hooks` du
 `settings.json` du starter — `mind-guard` en `PreToolUse`, `journal` en
 `PostToolUse`, chacun **déclaré deux fois** (`python` et `python3`) pour couvrir
 Windows et macOS.

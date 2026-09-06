@@ -231,7 +231,7 @@ def verdict(h):
         return "sans-hooks", "Mémoire en place mais aucun hook : `/agentic-sync`."
     if not h["cable"]:
         return "non-cable", ("Hooks copiés mais absents de `settings.json` : les câbler. "
-                             "Un hook qui ne démarre pas ne bloque rien et ne le dit pas.")
+                             "Un hook non câblé ne fait rien et ne le dit pas.")
     if not h["git"]:
         return "sans-git", ("Hooks câblés mais pas de dépôt git : ils se déclenchent au "
                             "commit, donc ils sont inertes.")

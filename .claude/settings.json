@@ -21,15 +21,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
+            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
             "timeout": 15,
-            "statusMessage": "briefing (.mind) [python]"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
-            "timeout": 15,
-            "statusMessage": "briefing (.mind) [python3]"
+            "statusMessage": "briefing (.mind)"
           }
         ]
       }
@@ -39,15 +33,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
+            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
             "timeout": 15,
-            "statusMessage": "briefing si .mind a changé [python]"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
-            "timeout": 15,
-            "statusMessage": "briefing si .mind a changé [python3]"
+            "statusMessage": "briefing si .mind a changé"
           }
         ]
       }
@@ -58,15 +46,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/mind-guard.py\"",
+            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/mind-guard.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/mind-guard.py\"",
             "timeout": 20,
-            "statusMessage": "mind-guard (le script filtre lui-même) [python]"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/mind-guard.py\"",
-            "timeout": 20,
-            "statusMessage": "mind-guard (le script filtre lui-même) [python3]"
+            "statusMessage": "mind-guard (le script filtre lui-même)"
           }
         ]
       }
@@ -77,15 +59,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/journal.py\"",
+            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/journal.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/journal.py\"",
             "timeout": 20,
-            "statusMessage": "journal (le script filtre lui-même) [python]"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/journal.py\"",
-            "timeout": 20,
-            "statusMessage": "journal (le script filtre lui-même) [python3]"
+            "statusMessage": "journal (le script filtre lui-même)"
           }
         ]
       }
