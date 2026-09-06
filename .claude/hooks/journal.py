@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """journal - hook PostToolUse (matcher Bash, sur `git commit`).
 
-Écrit ce qui a été commité dans `.logs/<AAAA-MM-JJ>.md`, un fichier par jour.
+Écrit ce qui a été commité dans `.logs/<AAAA-MM-JJ>.md` — et
+`.logs/<AAAA-MM-JJ>-<agent>.md` quand le projet est multi-agents, un fichier
+par jour ET par agent.
 Le journal répond à une question que `.mind/state.md` ne sait pas traiter :
 **qu'est-ce qui a été fait, jour par jour ?**
 
@@ -27,7 +29,7 @@ produit pas deux entrées.
 **fail-open, et silencieux** : un journal est un confort, il ne doit jamais
 empêcher de travailler. Toute erreur sort en code 0 sans message.
 """
-import sys, json, subprocess, re, pathlib
+import os, sys, json, subprocess, re, pathlib
 
 DOSSIER = ".logs"
 MAX_FICHIERS = 40  # nombre de fichiers listés dans une entrée, avant « … »
@@ -37,6 +39,40 @@ def _git(args):
     r = subprocess.run(["git"] + args, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", timeout=15)
     return r.stdout.strip() if r.returncode == 0 else None
+
+
+def suffixe_agent(racine):
+    """En MULTI-agents, le nom de l'agent, sinon la chaîne vide.
+
+    MESURÉ le 05/09/2026 sur Splide. Depuis qu'un agent a son propre répertoire
+    de travail (`git worktree`), `rev-parse --show-toplevel` renvoie la racine
+    DU WORKTREE : deux agents écrivent alors deux `.logs/<jour>.md` de même
+    chemin relatif, tous deux suivis par git, qui ne se voient pas et que la
+    première fusion met en collision (`untracked working tree files would be
+    overwritten`). Ça se reproduit à chaque fusion, et un journal qui bloque
+    une fusion a cessé d'être un confort.
+
+    Le nom vient de `CLAUDE_PROJECT_DIR`, comme dans `guard-branche` : en
+    multi-agents il vaut `<racine>/agents/<nom>/`. En mono-agent il vaut la
+    racine, la fonction rend "" et le nom de fichier ne change pas — aucun
+    projet existant n'est touché.
+
+    Le nom de fichier n'est parsé par AUCUN programme : vérifié le 05/09/2026,
+    `mind-guard` ne connaît `.logs/` que comme préfixe ignoré et les skills
+    n'en parlent qu'en prose. Le seul lecteur est Maxime, pour qui savoir QUI
+    a écrit est un gain, pas un coût.
+    """
+    p = os.environ.get("CLAUDE_PROJECT_DIR")
+    if not p:
+        return ""
+    try:
+        rel = pathlib.Path(p).resolve().relative_to(pathlib.Path(racine).resolve())
+    except (ValueError, OSError):
+        return ""
+    parts = rel.parts
+    if len(parts) == 2 and parts[0] == "agents":
+        return "-" + re.sub(r"[^A-Za-z0-9._-]+", "-", parts[1]).strip("-")
+    return ""
 
 
 def main():
@@ -60,7 +96,7 @@ def main():
         sys.exit(0)
     court, jour, iso, sujet, auteur = tete.split("\t")
 
-    fichier = pathlib.Path(racine) / DOSSIER / ("%s.md" % jour)
+    fichier = pathlib.Path(racine) / DOSSIER / ("%s%s.md" % (jour, suffixe_agent(racine)))
     deja = fichier.read_text(encoding="utf-8") if fichier.is_file() else ""
 
     # Le garde-fou contre les doublons : l'empreinte du commit. Un commit

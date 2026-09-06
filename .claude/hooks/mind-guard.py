@@ -199,9 +199,14 @@ def main():
     cmd = ((data.get("tool_input") or {}).get("command") or "")
     if not re.search(r"\bgit\b.+\bcommit\b", cmd):
         allow()
-    if "mind-ok" in cmd:
-        allow()
 
+    # `mind-ok` N'EST PAS TESTÉ ICI. Il l'était jusqu'au 05/09/2026, avant le
+    # contrôle `.fact/` — donc une seule clé ouvrait deux serrures qui ne
+    # protègent pas la même chose : « ma déclaration d'agent n'a pas à bouger »
+    # désarmait aussi la garde de la mémoire PARTAGÉE du projet. Chaque
+    # échappatoire est désormais testée devant la règle qu'elle lève, et pas
+    # avant. Repéré par `Splide OPS` en franchissant le trou en connaissance
+    # de cause, ce qui est la bonne façon de le signaler.
     lot, projet, faits = contexte()
     state, todo = lot + ".mind/state.md", lot + ".mind/todo.md"
     champs = CHAMPS_REQUIS_FACT if faits else CHAMPS_REQUIS
@@ -228,6 +233,11 @@ def main():
                  "l'a demandé, ajoute ` # fact-ok` à la fin de la commande : "
                  "l'autorisation restera dans l'historique."
                  % (", ".join(touches[:4]) + (", …" if len(touches) > 4 else "")))
+
+    # `mind-ok` ne lève QUE les règles sur la déclaration de l'agent, jamais
+    # celle sur `.fact/` ci-dessus. Voir le commentaire en tête de fonction.
+    if "mind-ok" in cmd:
+        allow()
 
     # 1. LISIBILITÉ — vaut même sans code, un fichier cassé est le pire cas.
     for nom, verif in ((state, lambda x: verifie_state(x, champs)),
