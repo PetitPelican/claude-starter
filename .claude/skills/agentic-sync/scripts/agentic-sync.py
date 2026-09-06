@@ -88,6 +88,20 @@ class Rapport:
     def main_humaine(self, m): self.manuel.append(m)
 
 
+def _a_miroiter(racine: pathlib.Path):
+    """Les fichiers d'un côté du miroir, sans les artefacts locaux.
+
+    MESURÉ le 06/09/2026 en resynchronisant Splide Studio : le miroir parcourt
+    le SYSTÈME DE FICHIERS, pas git. Le starter gitignore `__pycache__/`, donc
+    ses `.pyc` n'y sont que des résidus d'exécution des hooks — et le sync les
+    recopiait quand même dans le projet, du bytecode compilé pour la version de
+    Python du poste source. Exclus des DEUX côtés : ni copiés, ni comptés
+    absents, donc jamais supprimés chez le projet non plus."""
+    for p in racine.rglob("*"):
+        if p.is_file() and "__pycache__" not in p.parts and p.suffix != ".pyc":
+            yield p
+
+
 def miroir(source: pathlib.Path, cible: pathlib.Path, rap: Rapport, appliquer: bool):
     """Miroir d'un dossier 100 % starter-owned.
 
@@ -98,10 +112,9 @@ def miroir(source: pathlib.Path, cible: pathlib.Path, rap: Rapport, appliquer: b
         return
     avant = set()
     if cible.is_dir():
-        avant = {p.relative_to(cible).as_posix()
-                 for p in cible.rglob("*") if p.is_file()}
+        avant = {p.relative_to(cible).as_posix() for p in _a_miroiter(cible)}
     en_source = set()
-    for f in sorted(p for p in source.rglob("*") if p.is_file()):
+    for f in sorted(_a_miroiter(source)):
         rel = f.relative_to(source).as_posix()
         en_source.add(rel)
         dest = cible / rel
