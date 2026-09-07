@@ -19,8 +19,12 @@ DEUX CHOSES, DANS CET ORDRE :
      un récap. C'est une contrainte mécanique, pas une consigne de prose — la
      prose, on a mesuré qu'elle ne suffisait pas.
 
-  2. IL POUSSE vers la note iCloud de l'agent (dossier « agents »), que le commanditaire
-     lit depuis son iPhone.
+  2. IL POUSSE vers le canal du commanditaire — par défaut la liste de rappels
+     du système, une par agent, qu'il lit depuis son téléphone. Le canal a
+     d'abord été une note ; les cases à cocher n'y survivaient pas à
+     l'écriture, et une liste de rappels en offre de vraies. C'est ce qui
+     rend la boucle bidirectionnelle : cocher une entrée renvoie la décision
+     à l'agent.
 
 FAIL-OPEN PARTOUT, ET SILENCIEUX. Un hook de reporting ne doit jamais empêcher
 de travailler : toute erreur, tout doute, tout projet hors harnais sort en 0.

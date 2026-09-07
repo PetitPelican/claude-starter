@@ -15,20 +15,29 @@ relève de l'exploitation d'une machine n'y est pas.
 
 ## Où la méthode est écrite
 
-Trois fichiers, et un seul est la référence. À n'en lire qu'un, c'est le
+Quatre fichiers, et un seul est la référence. À n'en lire qu'un, c'est le
 premier.
 
 | Fichier | Ce qu'il contient | Pour qui |
 |---|---|---|
 | **[`templates/foundation-CLAUDE.md`](.claude/skills/agentic-init/templates/foundation-CLAUDE.md)** | **LA MÉTHODE, en entier** — mémoire, hooks, skills, délégation, frontières, réflexes | l'agent, et le lecteur |
+| [`SCHEMAS.md`](SCHEMAS.md) | **la même méthode en sept schémas** — l'ordre des phases, ce qui hérite de quoi, ce qui bloque quand. Aucune règle qui ne soit ailleurs | le lecteur pressé, et celui qui découvre |
 | ce `README.md` | comment **installer**, et ce que le dépôt **contient** | le lecteur, à l'arrivée |
 | `.claude/skills/*/SKILL.md` | le mode d'emploi détaillé d'**un** outil | l'agent, quand il le lance |
 
 Le template du socle n'est pas un document interne : c'est **le fichier qui est
 copié** en `~/Agentic/CLAUDE.md` par `/agentic-init`, et que tout agent ouvert
 dans un sous-dossier lit ensuite à chaque session. Le lire, c'est lire ce que
-les agents lisent. Il n'y a pas de version « pour humains » à côté, et c'est
-délibéré : deux versions divergeraient, et personne ne le verrait.
+les agents lisent.
+
+**`SCHEMAS.md` n'est pas une seconde version de la méthode**, et la distinction
+tient à une règle qu'il s'impose : *il n'énonce aucune règle qui n'existe pas
+déjà ailleurs*. Il donne la **forme** — l'ordre des sept phases, l'arbre des
+`CLAUDE.md`, ce que chaque hook bloque et à quel moment — c'est-à-dire ce qu'un
+fichier normatif, lu par un agent, ne peut pas montrer. Deux textes qui
+énonceraient les mêmes règles divergeraient sans que personne le voie ; un plan
+et un règlement, non. En cas d'écart, **le socle fait foi**, et l'écart est un
+défaut de `SCHEMAS.md`.
 
 Ce README, lui, ne réexplique pas la méthode — il dit ce qu'il y a dans la
 boîte et comment s'en servir.

@@ -91,6 +91,19 @@
           }
         ]
       }
-    ]
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/attente.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/attente.py\"",
+            "timeout": 40,
+            "statusMessage": "attente (ce qui revient au commanditaire)"
+          }
+        ]
+      }
+    ],
+    "_note_stop": "NE PAS RETIRER CE HOOK, et le poser sur CHAQUE agent. Sans lui, l'agent ne remonte RIEN au commanditaire — et rien ne le signale, `attente.py` étant fail-open par conception. Ce modèle a livré des agents muets tant que `Stop` y manquait : les quatre autres hooks tournaient, le harnais avait l'air complet, et les demandes s'accumulaient dans `.mind/todo.md` sans jamais atteindre personne. Contrairement aux quatre autres entrées, celle-ci n'est PAS dédoublée en `python`/`python3` : un seul appel avec repli, parce qu'un double appel pousserait deux fois vers le canal du commanditaire."
   }
 }
