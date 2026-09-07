@@ -13,12 +13,52 @@ relève de l'exploitation d'une machine n'y est pas.
 
 ---
 
-## ▶ Comprendre : [`SCHEMAS.md`](SCHEMAS.md)
+## La méthode, d'un coup d'œil
 
-**La méthode entière en sept schémas** — installer l'atelier · monter un projet ·
-découper en agents · écrire les `CLAUDE.md` · le workflow d'un échange · la
-boucle de décision · la mémoire. Plus les six pièges qui coûtent une demi-journée
-à qui les découvre seul.
+```
+  ┌─ UNE FOIS PAR MACHINE ──────────────────────────────────────────────┐
+  │   ① INSTALLER L'ATELIER          la méthode + le poste du pilote    │
+  └────────────────────────────────┬────────────────────────────────────┘
+                                   │
+  ┌─ UNE FOIS PAR PROJET ──────────┼────────────────────────────────────┐
+  │                                ▼                                    │
+  │   ② MONTER LE PROJET      neuf ? existant ? déjà au harnais ?       │
+  │                           puis : UN agent, ou PLUSIEURS ?           │
+  │                                │                                    │
+  │                       ┌────────┴────────┐                           │
+  │                     MONO             MULTI                          │
+  │                       │                 │                           │
+  │                       │        ③ DÉCOUPER EN AGENTS                 │
+  │                       │           OPS · PO · AUDIT                  │
+  │                       │           tout le monde lit tout,           │
+  │                       │           seule l'écriture est découpée     │
+  │                       └────────┬────────┘                           │
+  │                                ▼                                    │
+  │   ④ ÉCRIRE LES CLAUDE.md   avant de leur parler — 4 niveaux,        │
+  │                            et le settings.json n'est PAS hérité     │
+  └────────────────────────────────┬────────────────────────────────────┘
+                                   │
+  ┌─ À CHAQUE ÉCHANGE ─────────────┼────────────────────────────────────┐
+  │                                ▼                                    │
+  │   ⑤ LE WORKFLOW      il relit sa mémoire ─► il travaille ─►         │
+  │                      REFUSÉ s'il commite sans état à jour ─►        │
+  │                      REFUSÉ s'il rend la main sans noter            │
+  │                      ce qui t'attend                                │
+  │                                │                                    │
+  │   ⑥ LA BOUCLE        ses blocages arrivent sur ton téléphone ;      │
+  │                      tu coches, la décision repart vers l'agent     │
+  │                                │                                    │
+  │   ⑦ LA MÉMOIRE       .fact/ les faits · .mind/ l'état · docs/ les   │
+  │                      traces · .logs/ le journal automatique         │
+  └─────────────────────────────────────────────────────────────────────┘
+
+        LES DEUX REFUS DE ⑤ SONT TOUT LE SYSTÈME.
+        Pas des consignes — des blocages. On a mesuré que la prose
+        ne suffit pas.
+```
+
+**Chaque phase a son schéma dans [`SCHEMAS.md`](SCHEMAS.md)**, avec les six
+pièges qui coûtent une demi-journée à qui les découvre seul.
 
 **Ce README ne réexplique rien de tout ça.** Il ne contient que ce qu'un schéma
 ne peut pas porter : **les commandes à taper**, les prérequis, et les points
