@@ -196,6 +196,10 @@ PRIO_APPLE = {"haut": 1, "moyen": 5, "bas": 9}
 # aussi ce qu'on obtient sans marqueur : un quatrième rond promettrait une
 # distinction que la source ne porte pas.
 PASTILLE = {"haut": "🔴", "moyen": "🟠", "bas": "🟡"}
+# L'INVERSE — retrouver la priorité d'un rappel DÉJÀ posé. Rappels n'expose
+# aucun rang d'affichage : la pastille du titre est la seule trace de priorité
+# qu'on puisse relire sans rouvrir le todo.
+PASTILLE_RANG = {v: k for k, v in PASTILLE.items()}
 RANG = {"haut": 0, "moyen": 1, "bas": 2}
 
 RAPPELS_LIRE = '''
@@ -239,7 +243,12 @@ on run argv
         set champs to text items of unLot
         set AppleScript's text item delimiters to anciensDelims
         if (count of champs) is 3 then
-          make new reminder at l with properties {name:(item 1 of champs), body:(item 2 of champs), priority:((item 3 of champs) as integer)}
+          -- `flagged` sur les urgences : Rappels les regroupe alors dans sa liste
+          -- intelligente « Signalés », tous agents confondus. C'est la seule vue
+          -- que l'app offre gratuitement, et elle répond à la vraie question du
+          -- commanditaire — « qu'est-ce qui est urgent, partout ? » — sans lutter
+          -- contre un tri qu'aucune propriété n'expose.
+          make new reminder at l with properties {name:(item 1 of champs), body:(item 2 of champs), priority:((item 3 of champs) as integer), flagged:(((item 3 of champs) as integer) is 1)}
           set n to n + 1
         end if
       end if
@@ -564,6 +573,46 @@ def main():
                    if lib not in voulus and not fait and lib[:1] in "🔴🟠🟡")[:8]
     if aOter:
         _osa(RAPPELS_SUPPRIMER, agent, SEP_LOT.join(aOter))
+
+    # --- 4. remettre l'ordre ------------------------------------------------
+    # Rappels affiche dans l'ordre d'AJOUT, et son tri par priorité n'est pas
+    # scriptable : vérifié le 07/09/2026, un rappel n'expose ni position ni rang
+    # — name, body, priority, flagged, les dates, rien d'autre. Créer le premier
+    # lot déjà trié ne suffit donc pas, et c'est le commanditaire qui l'a vu :
+    # la demande urgente écrite aujourd'hui se range SOUS les demandes moyennes
+    # d'hier. Mesuré sur une liste réelle — quatre 🔴 enterrés sous huit 🟠.
+    #
+    # Un rappel RECRÉÉ repart en fin de liste. On recrée donc ceux qui devraient
+    # y être : est mal placé tout rappel suivi d'un rappel PLUS prioritaire.
+    # Le budget est partagé avec la purge — chaque suppression coûte une requête
+    # Apple Events (~2 s), et le hook entier tient dans 40 s.
+    budget = 8 - len(aOter)
+    if budget > 0:
+        par_lib = {}
+        for t in attente:
+            par_lib[libelle_rappel(t["titre"], t["prio"])[:250]] = t
+        ordre = [l for l in existants if l in voulus and not existants[l]]
+        ordre += [c.split(SEP_CHAMP)[0] for c in aCreer]
+        rangs = [RANG.get(PASTILLE_RANG.get(l[:1], "moyen"), 1) for l in ordre]
+        # le plus prioritaire qui reste APRÈS chaque position
+        apres = [9] * (len(rangs) + 1)
+        for i in range(len(rangs) - 1, -1, -1):
+            apres[i] = min(rangs[i], apres[i + 1])
+        malPlaces = [ordre[i] for i in range(len(rangs)) if apres[i + 1] < rangs[i]]
+        malPlaces = sorted(malPlaces, key=lambda l: RANG.get(PASTILLE_RANG.get(l[:1], "moyen"), 1))[:budget]
+        if malPlaces:
+            _osa(RAPPELS_SUPPRIMER, agent, SEP_LOT.join(malPlaces))
+            refaits = []
+            for lib in malPlaces:
+                t = par_lib.get(lib)
+                if not t:
+                    continue
+                refaits.append(SEP_CHAMP.join(
+                    (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " "),
+                     str(PRIO_APPLE.get(t["prio"], 5)))))
+            if refaits:
+                _osa(RAPPELS_ECRIRE, agent, SEP_LOT.join(refaits))
+
     dernier.write_text(empreinte)
     sortie()
 
