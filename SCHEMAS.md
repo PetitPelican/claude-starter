@@ -409,7 +409,21 @@ commanditaire* la personne pour qui les agents travaillent.
 │    N'INJECTE PAS leur contenu — ce serait la faute que .fact/ existe     │
 │    pour éviter : une copie qui se périme en silence.                     │
 │                                                                          │
-│    Se tait si .mind/ n'a pas changé depuis le tour précédent.            │
+│    Se tait si .mind/ n'a pas changé depuis le tour précédent — coût nul  │
+│    en régime établi. Il peut donc se poser sur une session DÉJÀ ouverte. │
+│                                                                          │
+│    DEUX REMONTÉES INDÉPENDANTES :                                        │
+│      le .mind/ le plus proche ─► l'état de l'agent qui parle             │
+│      le .fact/ le plus proche ─► son projet                              │
+│    En mono c'est le même dossier. En multi, l'agent vit dans             │
+│    agents/<nom>/ et le .fact/ est deux étages plus haut.                 │
+│                                                                          │
+│    ⚠️ LE SEUL CAS OÙ IL PARLE SANS ÉTAT : un .fact/ trouvé SANS .mind/   │
+│    signifie qu'on a ouvert la session à la racine d'un projet            │
+│    multi-agents — là où personne ne travaille, l'erreur la plus          │
+│    probable de cette forme. Il avertit et nomme les agents disponibles,  │
+│    au lieu de se taire : le silence y produirait exactement la sortie    │
+│    d'un projet en bonne santé.                                           │
 │                                                                          │
 │    LA PANNE QU'IL CORRIGE : un agent interrogé sur ses propres outils    │
 │    a répondu de travers, alors que la réponse tenait dans son            │
@@ -454,6 +468,15 @@ commanditaire* la personne pour qui les agents travaillent.
 │                    └──────────────────────────────┤                      │
 │                                                   ▼                      │
 │    échappatoire ` # mind-ok`                  LE COMMIT PASSE            │
+│                                                                          │
+│    ⚠️ IL CONNAÎT LE LOT. `git diff --cached` renvoie des chemins         │
+│    relatifs à la racine du DÉPÔT : un agent de agents/<nom>/ y voit      │
+│    « agents/<nom>/.mind/state.md ». Le hook dérive donc son préfixe de   │
+│    CLAUDE_PROJECT_DIR. Sans ça il ne garderait PLUS RIEN en              │
+│    multi-agents — et sans le dire.                                       │
+│                                                                          │
+│    Fail-open sur toute erreur. Dormant tant que `git commit` est         │
+│    interdit par défaut, actif dès qu'un projet autorise git.             │
 └──────────────────────────────────────────────────────────────────────────┘
    │
    ▼
@@ -651,6 +674,25 @@ commanditaire* la personne pour qui les agents travaillent.
                                  un projet sans ouvrir le dépôt. D'où le ton
                                  de state.md : il s'écrit pour quelqu'un qui
                                  n'a pas lu le code.
+
+   CE QUI EST CACHÉ EST DU HARNAIS, CE QUI EST VISIBLE EST POUR LE
+   COMMANDITAIRE. docs/ est le seul des quatre à ne pas commencer par un
+   point — et c'est le seul qu'il ouvre lui-même.
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  POURQUOI .fact/ ET .mind/ NE PORTENT PAS LE MÊME NOM                    ║
+║                                                                          ║
+║  Une remontée de dossier s'arrête au PREMIER trouvé. Un agent qui vit    ║
+║  dans agents/<nom>/ remonte deux fois :                                  ║
+║                                                                          ║
+║     agents/<nom>/.mind/  ◄── trouvé tout de suite : SON état             ║
+║     <projet>/.fact/      ◄── deux étages plus haut : SON projet          ║
+║                                                                          ║
+║  Deux étages HOMONYMES arrêteraient la seconde remontée sur la           ║
+║  première — et l'agent ne verrait JAMAIS l'architecture de son projet.   ║
+║  Le nom distinct n'est pas cosmétique : c'est ce qui rend les deux       ║
+║  remontées indépendantes.                                                ║
+╚══════════════════════════════════════════════════════════════════════════╝
 
    ⚠️ .mind/todo.md ET .logs/ NE PASSENT JAMAIS par une compression de texte
       (/caveman et apparentés) : ses règles fusionnent les listes, et les
