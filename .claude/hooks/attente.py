@@ -260,7 +260,16 @@ on run argv
     set aOter to text items of charge
     set AppleScript's text item delimiters to anciensDelims
     set n to 0
-    repeat with r in (reminders of list nomListe)
+    -- À L'ENVERS, ET C'EST OBLIGATOIRE. `delete` retire l'élément de la
+    -- collection qu'on est en train de parcourir : en avançant, les indices se
+    -- décalent et le parcours meurt sur « Can't get item N of every reminder »
+    -- (-1728). Mesuré le 07/09/2026 — le script avortait après la PREMIÈRE
+    -- suppression, donc plus rien n'était purgé, et `_osa` étant fail-open,
+    -- rien ne le disait : 86 rappels réglés depuis longtemps s'étaient
+    -- accumulés sur quatre listes. En descendant, un élément supprimé ne
+    -- décale que ceux qu'on a DÉJÀ vus.
+    repeat with i from (count of reminders of list nomListe) to 1 by -1
+      set r to reminder i of list nomListe
       if aOter contains (name of r) then
         delete r
         set n to n + 1
