@@ -243,12 +243,14 @@ on run argv
         set champs to text items of unLot
         set AppleScript's text item delimiters to anciensDelims
         if (count of champs) is 3 then
-          -- `flagged` sur les urgences : Rappels les regroupe alors dans sa liste
-          -- intelligente « Signalés », tous agents confondus. C'est la seule vue
-          -- que l'app offre gratuitement, et elle répond à la vraie question du
-          -- commanditaire — « qu'est-ce qui est urgent, partout ? » — sans lutter
-          -- contre un tri qu'aucune propriété n'expose.
-          make new reminder at l with properties {name:(item 1 of champs), body:(item 2 of champs), priority:((item 3 of champs) as integer), flagged:(((item 3 of champs) as integer) is 1)}
+          -- PAS DE `flagged`. Il a été posé sur les urgences le 07/09/2026 pour
+          -- offrir une vue transversale via la liste « Signalés », puis retiré le
+          -- jour même : le commanditaire a activé « Trier par ▸ Priorité » dans
+          -- l'app, et la liste se range d'elle-même. Un drapeau qui double un tri
+          -- déjà bon n'est plus un signal, c'est du bruit — et le drapeau
+          -- appartient au lecteur, pas à l'agent : il doit rester libre de
+          -- marquer ce qui compte POUR LUI.
+          make new reminder at l with properties {name:(item 1 of champs), body:(item 2 of champs), priority:((item 3 of champs) as integer)}
           set n to n + 1
         end if
       end if
