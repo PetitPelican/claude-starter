@@ -120,6 +120,35 @@ tâches.
 
 ---
 
+## Le cinquième fichier de `.fact/`
+
+Découper crée un besoin que le mono n'a pas : **le périmètre d'un agent est
+écrit dans SON `CLAUDE.md`, que lui seul charge.** Chacun connaît donc sa
+frontière et ignore celle des autres.
+
+Deux conséquences observées en usage, et aucune n'est théorique :
+
+- un agent qui **déduit** le périmètre d'un tiers pour ne pas l'enfreindre —
+  prudent, mais il devine ;
+- un dossier écrit par **deux agents** qui l'ignorent, chacun le croyant sien.
+  Les répertoires de travail séparés règlent le `git` ; ils ne règlent **pas**
+  le partage d'un périmètre.
+
+D'où `.fact/roles.md`, posé par `/agentic-agents` au découpage. Il répond au
+test de `.fact/` — *cette phrase resterait-elle vraie pour un autre agent ?* —
+et il porte trois choses :
+
+1. **qui tient quoi**, un dossier n'apparaissant qu'une fois ;
+2. **les zones partagées**, avec pour chacune *qui prévient qui, et quand* — un
+   périmètre propre se lit dans les `deny`, une zone partagée ne se lit nulle
+   part, et c'est là que les collisions arrivent ;
+3. **les frontières qui ne sont pas des dossiers** : branches, environnements,
+   et les **surfaces publiées** — un paquet importé par les autres lots, dont
+   le changement casse leur travail sans qu'ils puissent le prévoir.
+
+En mono, ce fichier n'a aucun sens : il n'y a personne d'autre. Le briefing ne
+le réclame donc jamais, il l'affiche seulement s'il existe.
+
 ## Les trois invariants qui font tenir l'ensemble
 
 Ce ne sont pas des principes : ce sont des règles qui ont tenu **contre leurs

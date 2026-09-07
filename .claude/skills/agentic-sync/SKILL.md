@@ -134,7 +134,8 @@ Comparer avec le `CLAUDE.md` du starter **uniquement sur les sections
 structurelles**, sans toucher au rôle ni aux règles métier du projet :
 
 - **Section « Mémoire projet »** : aligner sur les trois dossiers, trois natures —
-  `.fact/` = faits du projet, exactement quatre fichiers, le texte périmé s'y
+  `.fact/` = faits du projet, quatre fichiers (cinq en multi-agents, avec
+  `roles.md`), le texte périmé s'y
   **remplace** ; `docs/` = traces datées, ça s'accumule. Et les deux hooks.
 - **Règles** : si une règle générique a évolué dans le template, proposer le
   diff.

@@ -69,6 +69,11 @@ FENETRE_VERROU = 5          # s — au-delà, un verrou est considéré abandonn
 # `agents/<nom>/` de voir jamais l'architecture de son projet.
 MIND = ("state.md", "todo.md")
 FACT = ("base.md", "architecture.md", "stack.md", "rules.md")
+# `roles.md` est le SEUL fichier optionnel de `.fact/`, et il n'a de sens qu'en
+# multi-agents : qui tient quoi, et où sont les zones partagées. En mono il n'y
+# a personne d'autre, donc rien à déclarer. On ne le réclame donc jamais — il
+# s'affiche s'il existe, et son absence n'est pas un défaut.
+FACT_OPTIONNEL = ("roles.md",)
 # Avant migration, les cinq fichiers vivent dans `.mind/`. Le briefing lit les
 # deux formes : un projet non migré ne doit rien perdre.
 MIND_ANCIEN = ("state.md", "todo.md", "stack.md", "architecture.md", "rules.md")
@@ -208,7 +213,8 @@ def a_change(r, projet, depuis):
     surveilles = [r / ".mind" / n for n in MIND_ANCIEN] + \
                  [r / ".claude" / "settings.json", r / "CLAUDE.md"]
     if projet is not None:
-        surveilles += [projet / ".fact" / n for n in FACT] + [projet / "CLAUDE.md"]
+        surveilles += [projet / ".fact" / n for n in FACT + FACT_OPTIONNEL] \
+                      + [projet / "CLAUDE.md"]
     for p in surveilles:
         try:
             if p.stat().st_mtime > depuis:
@@ -290,6 +296,11 @@ def compose(r, projet):
     fichiers += [("stack.md", "outils, comptes, accès, versions"),
                  ("rules.md", "ce qu'on ne franchit pas"),
                  ("architecture.md", "comment c'est agencé, les frontières")]
+    # `roles.md` seulement s'il existe : le réclamer partout ferait afficher
+    # « ABSENT » à tous les projets mono, où il n'a aucun sens.
+    if faits:
+        fichiers += [(n, "qui tient quoi, et les zones partagées")
+                     for n in FACT_OPTIONNEL if (ou / n).is_file()]
     for nom, quoi in fichiers:
         s = sommaire(ou / nom)
         if not s:

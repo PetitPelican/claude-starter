@@ -258,6 +258,30 @@ def main():
                        [x for x in tous if x != n], a.apply, rap)
         porte_les_non_herites(p, d, a.apply, rap)
 
+    # `.fact/roles.md` — le cinquième fichier, qui n'existe qu'en multi-agents.
+    # Le périmètre d'un agent vit dans SON `CLAUDE.md`, que lui seul charge :
+    # chacun connaît sa frontière et ignore celle des autres. Constaté en usage,
+    # un agent déduisant le périmètre d'un tiers, et un dossier écrit par deux
+    # mains sans que personne le sache. On pose le gabarit ; le remplir est une
+    # décision, pas une génération.
+    fichier_roles = p / ".fact" / "roles.md"
+    if (p / ".fact").is_dir() and not fichier_roles.exists():
+        rap.append(("+", ".fact/roles.md — qui tient quoi, à remplir"))
+        if a.apply:
+            gabarit = (pathlib.Path(__file__).resolve().parent.parent
+                       / "templates" / "roles.md")
+            texte = gabarit.read_text(encoding="utf-8") if gabarit.exists() else \
+                    "# Les rôles — %s\n\n| Agent | Tient | Ne touche pas |\n|---|---|---|\n" % p.name
+            texte = texte.replace("[PROJECT_NAME]", p.name)
+            for i, n in enumerate(tous, 1):
+                texte = texte.replace("`<agent-%d>`" % i, "`%s`" % n)
+            fichier_roles.write_text(texte, encoding="utf-8")
+        reste.append("REMPLIR .fact/roles.md — qui tient quoi, et surtout LES ZONES "
+                     "PARTAGÉES. Un périmètre propre se lit dans les deny ; une zone "
+                     "partagée ne se lit nulle part, et c'est là que les collisions "
+                     "arrivent. C'est de la mémoire `.fact/` : elle s'écrit à la "
+                     "demande du commanditaire (` # fact-ok` au commit).")
+
     reste.append("DÉCOUPER LE CLAUDE.md — la seule étape qui ne s'automatise pas. Le "
                  "commun reste à la racine, le rôle descend dans agents/<nom>/CLAUDE.md. "
                  "Contrôle de sortie : aucune phrase du bas ne resterait vraie pour un "

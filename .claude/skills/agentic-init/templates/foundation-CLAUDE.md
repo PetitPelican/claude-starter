@@ -23,9 +23,10 @@ Trois couches, à ne pas mélanger :
 C'est le cœur. Ce qui les sépare n'est pas le sujet, c'est la **nature du
 texte**.
 
-**`.fact/`** — les **faits du projet**, en **exactement quatre fichiers**. Un
-seul écrivain pour tout le projet : un agent n'y écrit qu'à la demande de
-Le commanditaire, et `mind-guard` refuse un commit qui y touche sans ` # fact-ok`. Le
+**`.fact/`** — les **faits du projet**, en **quatre fichiers**, plus un
+cinquième `roles.md` **en multi-agents seulement**. Un
+seul écrivain pour tout le projet : un agent n'y écrit qu'à la demande
+du commanditaire, et `mind-guard` refuse un commit qui y touche sans ` # fact-ok`. Le
 texte périmé s'y **remplace**, il ne s'ajoute pas.
 
 | Fichier | Répond à |
@@ -34,6 +35,7 @@ texte périmé s'y **remplace**, il ne s'ajoute pas.
 | `stack.md` | avec quoi c'est fait |
 | `architecture.md` | comment c'est agencé, et ses frontières |
 | `rules.md` | ce qu'on ne franchit pas |
+| `roles.md` | **multi-agents seulement** — qui tient quoi, et les zones partagées |
 
 **`.mind/`** — l'**état d'un agent**, en deux fichiers, un jeu par agent : à la
 racine du projet en mono-agent, dans `agents/<nom>/` dès qu'il y en a plusieurs.
@@ -171,6 +173,14 @@ projet/                           projet/
 **Trois éléments par agent**, jamais plus : son `CLAUDE.md` de rôle, son
 `.claude/settings.json`, son `.mind/`. `.fact/`, `docs/`, `.logs/` et le code
 n'appartiennent à aucun agent.
+
+**Et un cinquième fichier apparaît dans `.fact/` : `roles.md`.** Le périmètre
+d'un agent est écrit dans SON `CLAUDE.md`, que lui seul charge — chacun connaît
+donc sa frontière et ignore celle des autres. Constaté : un agent qui déduit le
+périmètre d'un tiers pour ne pas l'enfreindre, et deux agents qui écrivent dans
+le même dossier sans le savoir. `roles.md` dit **qui tient quoi**, et surtout
+**quelles zones sont partagées** — ce qu'aucun `CLAUDE.md` de rôle ne peut dire,
+puisqu'il ne parle que d'un seul agent.
 
 **Ce qui décide de cette forme**, mesuré le 04/09/2026 :
 

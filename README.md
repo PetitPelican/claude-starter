@@ -198,7 +198,7 @@ L'agent scanne le projet, pose les questions nécessaires — **la première ét
 `.mind/` — puis configure :
 
 - `CLAUDE.md` — le rôle et les règles, adaptés au type de projet détecté
-- `.fact/` — les quatre fichiers de faits du projet
+- `.fact/` — les quatre fichiers de faits du projet, plus `roles.md` en multi-agents
 - `.mind/` — les deux fichiers d'état de l'agent
 - `docs/` — les traces datées
 - optionnellement, un site de documentation Quarto (`/publish-docs`)
@@ -290,7 +290,8 @@ et signale tout conflit sans rien écraser.
 **`briefing`** — `SessionStart` + `UserPromptSubmit`. Injecte à l'ouverture ce
 qui ne tient pas dans un pointeur : le `cap:` (lu dans `.fact/base.md`), la
 fraîcheur de la déclaration, les décisions en attente, les **titres de section**
-de `base.md`, `stack.md`, `rules.md` et `architecture.md`, et les règles `deny`
+de `base.md`, `stack.md`, `rules.md`, `architecture.md` (plus `roles.md` en
+multi-agents), et les règles `deny`
 réellement appliquées. Il ne recopie rien — il relit les fichiers à chaque
 déclenchement, donc rien ne peut s'y périmer.
 
@@ -363,7 +364,8 @@ fail-open — un journal ne doit jamais empêcher de travailler.
 
 Ce qui les sépare n'est pas le sujet, c'est **le nombre d'écrivains**.
 
-**`.fact/`** — les **faits du projet**, en **exactement quatre fichiers**. Un
+**`.fact/`** — les **faits du projet**, en **quatre fichiers**, plus
+`roles.md` en multi-agents. Un
 seul écrivain pour tout le projet ; les agents n'y touchent qu'à la demande de
 Le commanditaire. Le texte périmé s'y **remplace**, il ne s'ajoute pas.
 
