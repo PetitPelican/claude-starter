@@ -260,20 +260,26 @@ on run argv
     set aOter to text items of charge
     set AppleScript's text item delimiters to anciensDelims
     set n to 0
-    -- À L'ENVERS, ET C'EST OBLIGATOIRE. `delete` retire l'élément de la
-    -- collection qu'on est en train de parcourir : en avançant, les indices se
-    -- décalent et le parcours meurt sur « Can't get item N of every reminder »
-    -- (-1728). Mesuré le 07/09/2026 — le script avortait après la PREMIÈRE
-    -- suppression, donc plus rien n'était purgé, et `_osa` étant fail-open,
-    -- rien ne le disait : 86 rappels réglés depuis longtemps s'étaient
-    -- accumulés sur quatre listes. En descendant, un élément supprimé ne
-    -- décale que ceux qu'on a DÉJÀ vus.
-    repeat with i from (count of reminders of list nomListe) to 1 by -1
-      set r to reminder i of list nomListe
-      if aOter contains (name of r) then
-        delete r
-        set n to n + 1
-      end if
+    -- PAR FILTRE NATIF, ET LES DEUX AUTRES FORMES ONT ÉTÉ ESSAYÉES LE
+    -- 07/09/2026 — chacune échoue à sa manière, et aucune ne le dit :
+    --
+    --   `repeat with r in (reminders of list …)` + `delete r` : `delete`
+    --   retire l'élément de la collection qu'on parcourt, les indices se
+    --   décalent, et le parcours MEURT sur « Can't get item N of every
+    --   reminder » (-1728) après la PREMIÈRE suppression.
+    --
+    --   `repeat with i … to 1 by -1` + `reminder i of list` : correct, mais
+    --   chaque accès indexé est une requête Apple Events à part. Sur une
+    --   vingtaine de rappels le script dépasse le `timeout=25` de `_osa`,
+    --   qui rend alors `None` — on ne supprime qu'une partie du lot, et
+    --   comme le hook est fail-open, ça ressemble à un succès.
+    --
+    -- `whose name is` laisse Reminders faire le travail en une passe : ni
+    -- décalage d'indices, ni aller-retour par élément.
+    repeat with unNom in aOter
+      set cibles to (every reminder of list nomListe whose name is (unNom as text))
+      set n to n + (count of cibles)
+      delete cibles
     end repeat
     return (n as text)
   end tell
@@ -549,8 +555,13 @@ def main():
     # lui, un rappel écrit par le commanditaire (qui n'en porte pas, et n'est donc jamais
     # dans `voulus`) serait effacé au tour suivant : sa demande disparaîtrait
     # sans laisser de trace. Attrapé par le test du canal descendant.
-    aOter = [lib for lib, fait in existants.items()
-             if lib not in voulus and not fait and lib[:1] in "🔴🟠🟡"]
+    # BORNÉ PAR TOUR. Chaque nom coûte une requête Apple Events — ~2 s mesuré
+    # le 07/09/2026 — et `_osa` coupe à 25 s : un lot de 18 rendait `None` après
+    # avoir supprimé une partie, ce qui ressemble à un succès. En régime établi
+    # la purge ne touche que ce que l'agent vient de régler, un à trois rappels ;
+    # au-delà, c'est un rattrapage, et il se termine aux tours suivants.
+    aOter = sorted(lib for lib, fait in existants.items()
+                   if lib not in voulus and not fait and lib[:1] in "🔴🟠🟡")[:8]
     if aOter:
         _osa(RAPPELS_SUPPRIMER, agent, SEP_LOT.join(aOter))
     dernier.write_text(empreinte)
