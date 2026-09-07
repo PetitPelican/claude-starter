@@ -71,10 +71,18 @@ racine, partagés, et ne s'écrivent qu'à la demande de l'humain pour `.fact/`.
 
 **Tenir `.mind/` à jour fait partie du travail, pas de la paperasse d'après.** Avant de rendre la main, `state.md` et `todo.md` disent l'état réel. Publier la doc publique : `/publish-docs` (ne lit jamais `operations.md`).
 
-Deux hooks (câblés dans `settings.json`) rendent ça structurel :
+Trois hooks (câblés dans `settings.json`) rendent ça structurel, et chacun a son
+moment :
 
-- **`mind-guard`** refuse un `git commit` de code qui laisserait `.mind/state.md` ou `.mind/todo.md` en arrière — ou qui les rendrait illisibles, ce qui ferait disparaître le projet du tableau de bord **sans bruit**. Échappatoire ` # mind-ok`.
+- **`mind-guard`** refuse un `git commit` de code qui laisserait `.mind/state.md` en arrière — ou qui le rendrait illisible, ce qui ferait disparaître le projet du tableau de bord **sans bruit**. Échappatoire ` # mind-ok`.
 - **`journal`** écrit après chaque commit dans `.logs/<AAAA-MM-JJ>.md` : un fichier par jour, append-only. C'est l'historique ; `.mind/state.md` est l'instantané.
+- **`attente`** est un `Stop` : il se déclenche **à chaque fin de tour**, quand l'agent rend la main. Il refuse cette main si du code a bougé sans que `.mind/todo.md` suive, puis reporte ce qui attend l'humain là où il le lira.
+
+**Le todo n'est PAS gardé par le hook du commit, et c'est délibéré.** Il l'a été,
+et ça ne pouvait pas marcher : un agent qui analyse, qui est bloqué maintenant,
+ou qui n'a pas encore commité n'écrivait rien. `state.md` est un instantané, il
+se pose à un jalon — `commit` va bien. `todo.md` est une alerte : elle ne peut
+pas attendre le jalon suivant.
 
 Tous deux sont dormants tant que git est interdit par défaut. Si [RTK](https://github.com/rtk-ai/rtk) est installé sur la machine, il réécrit `git commit` en `rtk git commit` : les deux hooks sont déclarés sur les **deux** formes, et `.rtk/filters.toml` porte les filtres de ce dépôt.
 

@@ -188,7 +188,7 @@ Conversion et ajout d'agent : `/agentic-agents`. Il migre la mémoire auto, qui
 est classée par chemin — sans ça l'agent repart sur une adresse vide et
 `--resume` ne retrouve rien.
 
-## Les trois hooks
+## Les quatre hooks
 
 Ils rendent la règle **appliquée** au lieu d'énoncée. Tous sont **fail-open** :
 une erreur, un fichier absent, un dépôt sans `.mind/` laissent passer.
@@ -218,16 +218,38 @@ une erreur, un fichier absent, un dépôt sans `.mind/` laissent passer.
   sur une **session déjà ouverte** : un `settings.json` de projet ajouté à
   chaud est relu sans redémarrage (vérifié), et le message suivant est briefé.
 
-Les deux autres se déclenchent sur `git commit`, et restent dormants tant que
+Deux autres se déclenchent sur `git commit`, et restent dormants tant que
 git est refusé par défaut dans `settings.json`.
 
 - **`mind-guard`** (`PreToolUse`) — refuse un commit de **code projet** qui
-  laisserait `state.md` ou `todo.md` en arrière, ou qui les rendrait
-  **illisibles**. Il lit le contenu **indexé**, pas celui du disque.
-  Échappatoire : ` # mind-ok` en fin de commande.
+  laisserait `state.md` en arrière, ou qui le rendrait **illisible**. Il lit le
+  contenu **indexé**, pas celui du disque. Échappatoire : ` # mind-ok` en fin de
+  commande.
 - **`journal`** (`PostToolUse`) — écrit dans `.logs/<jour>.md`. Il regarde
   `HEAD`, pas le retour de la commande : un commit échoué n'écrit rien, un
   double appel ne crée pas deux entrées.
+
+Le dernier ne dépend d'aucune commande, et c'est ce qui fait sa valeur.
+
+- **`attente`** (`Stop`) — se déclenche **à chaque fin de tour**, quand l'agent
+  rend la main. Il refuse cette main (code de sortie 2) si du code a bougé sans
+  que `.mind/todo.md` suive, puis reporte ce qui attend l'humain là où il le
+  lira vraiment.
+
+  **Pourquoi `todo.md` a quitté le hook du commit.** Il y était, et ça ne
+  pouvait pas marcher : `mind-guard` ne s'arme que sur `git commit`, donc un
+  agent qui analyse, qui est bloqué maintenant, ou qui n'a pas encore commité
+  n'écrivait **rien**. Mesuré sur un atelier réel : 124 demandes s'y étaient
+  empilées sans qu'une seule remonte. Un instantané (`state.md`) se pose à un
+  jalon — `commit` va bien. Une alerte (`todo.md`) ne peut pas attendre le
+  jalon suivant. **Avant de câbler un hook, demander QUAND il doit voir, pas
+  seulement quoi.**
+
+  **Toujours borner un `Stop` qui bloque.** Il se redéclenche après le tour
+  qu'il provoque : sans garde, un agent qui n'obtempère pas tourne à l'infini.
+  On mémorise la signature de l'état ayant causé le blocage, et si elle se
+  représente à l'identique on laisse passer. Au pire un rappel manqué, jamais
+  un agent coincé.
 
 `mind-guard-relais.py` sert aux dépôts **multi-domaines** : chaque sous-périmètre
 le pose à la place du hook, et il remonte à la racine par `git rev-parse`.

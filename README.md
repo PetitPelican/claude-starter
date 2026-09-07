@@ -112,8 +112,8 @@ Sur Windows, l'interpréteur s'appelle `python`, et le dossier temporaire
 
 | | Pourquoi |
 |---|---|
-| **Python** | dépendance dure — les quatre hooks en ont besoin. `python` sur Windows, `python3` sur macOS. |
-| **git** | sans dépôt, `mind-guard` et `journal` sont **inertes** — et ne le disent pas. |
+| **Python** | dépendance dure — les cinq hooks en ont besoin. `python` sur Windows, `python3` sur macOS. |
+| **git** | sans dépôt, `mind-guard`, `journal` et `attente` sont **inertes** — et ne le disent pas. |
 | **un compte Claude Code** | avec l'isolation qui convient si la machine en sert plusieurs. |
 
 Trois couches, une seule voyage :

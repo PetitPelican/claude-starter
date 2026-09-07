@@ -115,8 +115,14 @@ Vérifier que `settings.json` du projet déclare, comme celui du starter :
 
 - `mind-guard.py` en **`PreToolUse`** sur `Bash(git commit*)`
 - `journal.py` en **`PostToolUse`** sur `Bash(git commit*)`
+- `attente.py` en **`Stop`**, sans matcher — il se déclenche à chaque fin de
+  tour, pas sur une commande
 - chacun **deux fois**, une entrée `python` et une entrée `python3`, pour
   couvrir Windows et macOS sans opérateur de shell.
+
+Un projet déjà au harnais **n'a pas** le `Stop` : il est arrivé après. Le poser
+est le point le plus facile à oublier d'une resynchro, et son absence ne se voit
+pas — un hook non câblé ne fait rien et ne le dit pas.
 
 Un dépôt **multi-domaines** pose `mind-guard-relais.py` dans les
 sous-périmètres : il remonte à la racine par `git rev-parse`, sans compter les
@@ -197,8 +203,10 @@ rg -n -iE "(BEGIN PRIVATE|AccountKey|SAS=|[0-9]{1,3}(\.[0-9]{1,3}){3})" .mind .m
 ```
 
 Puis un contrôle qui vaut mieux qu'une lecture : faire un commit de test et
-vérifier que `mind-guard` réagit, et que `.logs/<jour>.md` s'écrit. Un hook
-qu'on n'a pas vu se déclencher n'est pas un hook vérifié.
+vérifier que `mind-guard` réagit, et que `.logs/<jour>.md` s'écrit. Pour
+`attente`, modifier un fichier de code sans toucher `.mind/todo.md` et finir un
+tour : l'agent doit être renvoyé au travail. Un hook qu'on n'a pas vu se
+déclencher n'est pas un hook vérifié.
 
 ## Règles
 

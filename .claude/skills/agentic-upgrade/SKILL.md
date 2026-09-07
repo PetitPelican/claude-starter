@@ -20,7 +20,7 @@ description: >
 - conserver `.claude/` et `CLAUDE.md` tels qu'ils sont
 - poser `.fact/` (les quatre fichiers), `.mind/` (les deux) et `docs/`
 - remonter la mémoire de `.claude/memory/` vers `docs/`
-- poser les deux hooks (`mind-guard`, `journal`) et les skills manquants
+- poser les trois hooks (`mind-guard`, `journal`, `attente`) et les skills manquants
 - ne jamais écraser un fichier personnalisé sans le signaler
 
 ## Procédure
@@ -108,8 +108,9 @@ Les hooks ont été **copiés**, mais un projet qui avait déjà un `settings.js
 garde le sien : les hooks y sont peut-être branchés nulle part. Un hook qui ne
 est pas câblé ne fait rien **et ne le dit pas**. Recopier le bloc `hooks` du
 `settings.json` du starter — `mind-guard` en `PreToolUse`, `journal` en
-`PostToolUse`, chacun **déclaré deux fois** (`python` et `python3`) pour couvrir
-Windows et macOS.
+`PostToolUse`, `attente` en **`Stop`** (sans matcher : il se déclenche à chaque
+fin de tour, pas sur une commande), chacun **déclaré deux fois** (`python` et
+`python3`) pour couvrir Windows et macOS.
 
 ### 3. `CLAUDE.md`
 

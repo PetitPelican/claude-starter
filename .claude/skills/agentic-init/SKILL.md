@@ -86,10 +86,11 @@ cd ~/Agentic/cto && claude
 
 Le script pose des fichiers. Il ne décide rien. Trois choses lui échappent :
 
-**Le câblage des hooks.** Le harnais copie `mind-guard.py` et `journal.py`, mais
-le bloc `hooks` de `settings.json` appartient au projet. Vérifier qu'ils y sont
-déclarés, chacun **deux fois** — une entrée `python`, une `python3` — pour
-couvrir Windows et macOS sans opérateur de shell.
+**Le câblage des hooks.** Le harnais copie `mind-guard.py`, `journal.py` et
+`attente.py`, mais le bloc `hooks` de `settings.json` appartient au projet.
+Vérifier qu'ils y sont déclarés — les deux premiers sur `git commit`, `attente`
+en **`Stop`** sans matcher — chacun **deux fois**, une entrée `python`, une
+`python3`, pour couvrir Windows et macOS sans opérateur de shell.
 
 **Deux pannes de hook, opposées, à ne pas confondre.** Un hook **non câblé** ne
 fait rien et ne le dit pas — c'est le silence qu'on cherche à éviter ici. Mais
@@ -102,8 +103,10 @@ C'est pour ça que les commandes s'ancrent sur `${CLAUDE_PROJECT_DIR:-.}` et
 jamais sur le cwd.
 
 **La preuve.** Faire un commit d'essai de code sans toucher `.mind/`, voir
-`mind-guard` refuser, puis vérifier que `.logs/<jour>.md` s'écrit. Un hook qu'on
-n'a pas vu se déclencher n'est pas un hook vérifié.
+`mind-guard` refuser, puis vérifier que `.logs/<jour>.md` s'écrit. Pour
+`attente` : modifier du code sans toucher `.mind/todo.md` et finir un tour,
+l'agent doit être renvoyé au travail. Un hook qu'on n'a pas vu se déclencher
+n'est pas un hook vérifié.
 
 **Le contenu du socle.** Le template porte la méthode générique. Ce qui est propre
 à la **machine** — comptes, sessions, réseau, contraintes mémoire — n'y va pas :

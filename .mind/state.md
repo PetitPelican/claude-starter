@@ -1,5 +1,5 @@
 ---
-maj: YYYY-MM-DD
+maj: 2026-09-07
 sante: vert
 jalon: [LE_PROCHAIN_CAILLOU — celui qui débloque les autres]
 ---
