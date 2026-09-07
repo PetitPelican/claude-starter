@@ -25,7 +25,7 @@ texte**.
 
 **`.fact/`** — les **faits du projet**, en **exactement quatre fichiers**. Un
 seul écrivain pour tout le projet : un agent n'y écrit qu'à la demande de
-Maxime, et `mind-guard` refuse un commit qui y touche sans ` # fact-ok`. Le
+Le commanditaire, et `mind-guard` refuse un commit qui y touche sans ` # fact-ok`. Le
 texte périmé s'y **remplace**, il ne s'ajoute pas.
 
 | Fichier | Répond à |
@@ -114,7 +114,7 @@ jalon: le prochain caillou, celui qui débloque les autres
 --- .mind/todo.md ---
 ## Chantiers            # seul ce qui suit ce titre est lu
 
-- [ ] !haut @humain  ce qui attend une décision
+- [ ] !haut @user  ce qui attend une décision
 - [>] !moyen         en cours
 - [x]                fait
 ```
@@ -135,6 +135,25 @@ différents et des contextes disjoints — typiquement infra/fiabilité d'un cô
 produit/apps de l'autre — il peut en porter plusieurs. Ce n'est pas une réponse
 à « le projet est gros » : un projet gros mais d'un seul tenant se tient très
 bien à un agent.
+
+**On ne découpe pas par couche technique.** Un lot « back » tient aussi la CI,
+le workspace et l'outillage — rien de tout ça n'est du back, et c'est pourtant
+ce qui casse le travail de l'autre. Le critère est la **dépendance** :
+*qu'est-ce que l'autre lot subit sans pouvoir le vérifier lui-même ?* D'où trois
+rôles types, et un quatrième hors projet :
+
+| | tient | ne tient pas |
+|---|---|---|
+| **socle** | base, routes serveur, paquets publiés, CI, workspace | ce que voit l'utilisateur |
+| **produit** | applications, logique métier, vitrine, builds | le socle, la mise en production |
+| **épreuve** | **rien** — lit tout, écrit nulle part ; livre un plan que les autres exécutent | il ne répare jamais ce qu'il audite |
+| *atelier* | *le poste et le harnais, hors projet* | *les projets — lecture seule* |
+
+Le détail — ce que chaque rôle couvre, ce que ce modèle **ne** couvre pas, le
+seuil de découpage et son coût — est dans
+`.claude/skills/agentic-agents/references/roles.md`. Le lire **avant** de
+découper : le nom d'un rôle façonne durablement le comportement de l'agent qui
+le porte.
 
 ```
 MONO                              MULTI

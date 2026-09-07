@@ -17,18 +17,18 @@ Le dossier `.claude/` doit être présent dans le projet.
 
 **Nouveau projet (répertoire vide) :**
 ```bash
-git clone https://github.com/PetitPelican/claude-starter.git .
+git clone https://github.com/<compte>/claude-starter.git .
 ```
 
 **Projet existant (code déjà présent) :**
 ```bash
 # Linux / Mac
-git clone https://github.com/PetitPelican/claude-starter.git /tmp/claude-starter
+git clone https://github.com/<compte>/claude-starter.git /tmp/claude-starter
 cp -r /tmp/claude-starter/.claude ./
 rm -rf /tmp/claude-starter
 
 # Windows PowerShell
-git clone https://github.com/PetitPelican/claude-starter.git $env:TEMP\claude-starter
+git clone https://github.com/<compte>/claude-starter.git $env:TEMP\claude-starter
 Copy-Item -Recurse "$env:TEMP\claude-starter\.claude" ".\.claude"
 Remove-Item -Recurse -Force "$env:TEMP\claude-starter"
 ```
@@ -206,7 +206,7 @@ du chemin d'appel des hooks — `.claude/hooks/…` en mono, `../../.claude/hook
 depuis un dossier d'agent. La poser après obligerait à défaire ce qui vient
 d'être posé.
 
-**Dire à Maxime que sa réponse n'engage à rien** : la conversion est un appel de
+**Dire au commanditaire que sa réponse n'engage à rien** : la conversion est un appel de
 skill (`/agentic-agents`), il n'y a pas à deviner juste au premier jour.
 
 - **mono** *(défaut)* — un agent, à la racine. C'est la forme de huit projets
@@ -218,7 +218,7 @@ skill (`/agentic-agents`), il n'y a pas à deviner juste au premier jour.
   tient très bien à un agent.
 
 Si **multi**, demander les noms des agents, et vérifier qu'aucun couple ne se
-slugifie pareil (`Splide OPS` / `Splide-OPS` partageraient une seule mémoire
+slugifie pareil (`<projet> OPS` / `<projet>-OPS` partageraient une seule mémoire
 auto, en silence). Puis poser le harnais en mono et lancer `/agentic-agents`
 plutôt que de bricoler l'arborescence à la main.
 
@@ -332,7 +332,7 @@ Ne pas inclure une règle si elle ne s'applique pas au projet. Ne pas laisser le
 
 ### Mémoire — trois dossiers, trois natures
 
-La mémoire tient en **trois dossiers, trois natures**, séparés par le nombre d'écrivains. `.fact/` porte les **faits du projet** — exactement quatre fichiers (`base`, `architecture`, `stack`, `rules`), un seul écrivain pour tout le projet, écrits à la demande de Maxime. `.mind/` porte l'**état d'un agent** — `state` et `todo`, un jeu par agent. `docs/` garde les **traces datées** et la matière du domaine, et s'accumule. Les tests qui tranchent : « on a décidé de » ou une date au passé → `docs/` ; ce qui resterait vrai pour un autre agent → `.fact/` ; ce que cet agent seul tient → `.mind/`. **Jamais un cinquième fichier dans `.fact/`, jamais un troisième dans `.mind/`.**
+La mémoire tient en **trois dossiers, trois natures**, séparés par le nombre d'écrivains. `.fact/` porte les **faits du projet** — exactement quatre fichiers (`base`, `architecture`, `stack`, `rules`), un seul écrivain pour tout le projet, écrits à la demande du commanditaire. `.mind/` porte l'**état d'un agent** — `state` et `todo`, un jeu par agent. `docs/` garde les **traces datées** et la matière du domaine, et s'accumule. Les tests qui tranchent : « on a décidé de » ou une date au passé → `docs/` ; ce qui resterait vrai pour un autre agent → `.fact/` ; ce que cet agent seul tient → `.mind/`. **Jamais un cinquième fichier dans `.fact/`, jamais un troisième dans `.mind/`.**
 
 Il n'y a pas de `charter.md` : ce que le projet doit produire tient dans le champ `cap:` de `.mind/state.md`, son rôle dans `CLAUDE.md`, ses frontières dans `.fact/architecture.md`.
 

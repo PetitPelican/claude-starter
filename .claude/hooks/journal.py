@@ -44,7 +44,7 @@ def _git(args):
 def suffixe_agent(racine):
     """En MULTI-agents, le nom de l'agent, sinon la chaîne vide.
 
-    MESURÉ le 05/09/2026 sur Splide. Depuis qu'un agent a son propre répertoire
+    MESURÉ le 05/09/2026 sur <projet>. Depuis qu'un agent a son propre répertoire
     de travail (`git worktree`), `rev-parse --show-toplevel` renvoie la racine
     DU WORKTREE : deux agents écrivent alors deux `.logs/<jour>.md` de même
     chemin relatif, tous deux suivis par git, qui ne se voient pas et que la
@@ -59,7 +59,7 @@ def suffixe_agent(racine):
 
     Le nom de fichier n'est parsé par AUCUN programme : vérifié le 05/09/2026,
     `mind-guard` ne connaît `.logs/` que comme préfixe ignoré et les skills
-    n'en parlent qu'en prose. Le seul lecteur est Maxime, pour qui savoir QUI
+    n'en parlent qu'en prose. Le seul lecteur est le commanditaire, pour qui savoir QUI
     a écrit est un gain, pas un coût.
     """
     p = os.environ.get("CLAUDE_PROJECT_DIR")

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""attente - hook Stop. Ce qui attend Maxime, à chaque fin de tour.
+"""attente - hook Stop. Ce qui attend le commanditaire, à chaque fin de tour.
 
 POURQUOI CE HOOK EXISTE. `.mind/todo.md` était réclamé par `mind-guard`, un
 `PreToolUse` armé sur `git commit`. Mesuré le 06/09/2026 : un agent qui analyse,
 qui est bloqué maintenant, ou qui n'a pas encore commité n'écrivait donc RIEN.
-Ce qui attendait Maxime n'arrivait qu'au prochain commit, parfois jamais — et
+Ce qui attendait le commanditaire n'arrivait qu'au prochain commit, parfois jamais — et
 124 demandes s'étaient accumulées sur 10 projets sans qu'aucune ne remonte.
 
 `Stop` est documenté « When Claude finishes responding » : une fois par tour, au
-moment où l'agent rend la main. C'est le seul instant qui coïncide avec « Maxime
+moment où l'agent rend la main. C'est le seul instant qui coïncide avec « Le commanditaire
 va peut-être lire ».
 
 DEUX CHOSES, DANS CET ORDRE :
@@ -19,7 +19,7 @@ DEUX CHOSES, DANS CET ORDRE :
      un récap. C'est une contrainte mécanique, pas une consigne de prose — la
      prose, on a mesuré qu'elle ne suffisait pas.
 
-  2. IL POUSSE vers la note iCloud de l'agent (dossier « agents »), que Maxime
+  2. IL POUSSE vers la note iCloud de l'agent (dossier « agents »), que le commanditaire
      lit depuis son iPhone.
 
 FAIL-OPEN PARTOUT, ET SILENCIEUX. Un hook de reporting ne doit jamais empêcher
@@ -35,13 +35,27 @@ représente à l'identique, on laisse passer. Au pire, un rappel manqué ; jamai
 un agent coincé.
 
 CE HOOK NE PARSE PAS LE DIALECTE. `chantiers()` de `claude-projets` est le
-lecteur de `todo.md` (`!haut`, `@maxime`, les états), et il est importé, jamais
+lecteur de `todo.md` (`!haut`, `@user`, les états), et il est importé, jamais
 recopié : deux lecteurs du même format divergent au premier changement.
 """
 import sys, os, re, json, subprocess, pathlib, hashlib, datetime, unicodedata
 import importlib.machinery, importlib.util
 
 ETAT = pathlib.Path.home() / ".claude" / "attente"
+
+# À QUI S'ADRESSE UNE DEMANDE. Le dialecte de `todo.md` écrit `@<qui>`, et le
+# gabarit du starter livre `@user`. Un atelier qui emploie un autre nom — un
+# prénom, un rôle — le déclare ici ou dans `ATTENTE_DESTINATAIRES`, séparé par
+# des virgules. La comparaison se fait en minuscules, comme le parseur.
+#
+# NE PAS écrire un nom en dur dans ce fichier : il est partagé par tous les
+# projets, et un hook qui ne reconnaît pas le destinataire ne remonte RIEN —
+# sans le dire, puisqu'il est fail-open.
+DESTINATAIRES = tuple(
+    d.strip().lower()
+    for d in os.environ.get("ATTENTE_DESTINATAIRES", "user").split(",")
+    if d.strip()
+) or ("user",)
 
 def sortie(code=0, message=None):
     if message:
@@ -76,8 +90,8 @@ def _git(args, cwd=None):
 def nom_agent(racine):
     """Le nom LISIBLE de l'agent — c'est un titre de note, pas un slug.
 
-    `journal.suffixe_agent()` résout le même cas mais rend `-Splide-OPS` : il
-    nomme un fichier. Ici on veut « Splide OPS », tel que Maxime l'a écrit et
+    `journal.suffixe_agent()` résout le même cas mais rend `-<projet>-OPS` : il
+    nomme un fichier. Ici on veut « <projet> OPS », tel que le commanditaire l'a écrit et
     tel que l'app Claude l'affiche.
     """
     depart = os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
@@ -85,10 +99,10 @@ def nom_agent(racine):
     try:
         rel = p.relative_to(pathlib.Path(racine).resolve())
         if len(rel.parts) == 2 and rel.parts[0] == "agents":
-            return rel.parts[1]          # multi-agents : « Splide OPS »
+            return rel.parts[1]          # multi-agents : « <projet> OPS »
     except (ValueError, OSError):
         pass
-    return p.name                        # mono-agent : « Kamadja »
+    return p.name                        # mono-agent : « <projet> »
 
 
 def blocs_bruts(texte):
@@ -124,7 +138,7 @@ def blocs_bruts(texte):
 
 
 def lisible(s):
-    """Du Markdown vers ce que Maxime lit sur son iPhone."""
+    """Du Markdown vers ce que le commanditaire lit sur son iPhone."""
     s = s.replace("`", "").replace("**", "").replace("__", "")
     return re.sub(r"\s{2,}", " ", s).strip(" .,;—-")
 
@@ -155,9 +169,9 @@ def _osa(script, *args):
         return None
 
 
-# UNE LISTE PAR AGENT, qui porte son nom — « CTO », « Splide OPS ».
+# UNE LISTE PAR AGENT, qui porte son nom — « CTO », « <projet> OPS ».
 # La première version n'en faisait qu'une, « 🤖 Décisions », avec le nom de
-# l'agent en tête de chaque titre. Maxime a tranché pour une liste par agent, et
+# l'agent en tête de chaque titre. Le commanditaire a tranché pour une liste par agent, et
 # il a raison : Rappels a déjà une vue « Tout » qui agrège, donc séparer ne
 # coûte pas la vue d'ensemble, alors que fondre les dix perdait la séparation.
 #
@@ -297,7 +311,7 @@ def rappels_etat(liste, cache_s=60):
     agent enchaîne parfois plusieurs tours en une minute, le résultat est gardé
     `cache_s` secondes : on ne paie qu'une fois. Le prix de ce cache est un
     retour différé d'au plus une minute — sans commune mesure avec le temps que
-    Maxime met à décider.
+    Le commanditaire met à décider.
     """
     cache = ETAT / ("coches-%s.cache" % re.sub(r"[^A-Za-z0-9_-]", "-", liste))
     try:
@@ -311,7 +325,7 @@ def rappels_etat(liste, cache_s=60):
         return [], []
     faits, _, ouverts = brut.partition(SEP_LOT)
     val = ([l.strip() for l in faits.splitlines() if l.strip()],
-           # SANS PASTILLE = ÉCRIT PAR MAXIME. L'agent préfixe toujours ses
+           # SANS PASTILLE = ÉCRIT PAR L'UTILISATEUR. L'agent préfixe toujours ses
            # rappels d'un 🔴🟠🟡 ; un rappel qui n'en porte pas vient donc de
            # lui. C'est ce qui remplace le canal descendant que portaient les
            # notes, et en mieux : c'est la même surface, dans les deux sens.
@@ -342,7 +356,7 @@ def main():
     racine = pathlib.Path(r.stdout.strip())
 
     # EN MULTI-AGENTS, LES HOOKS SONT CEUX DU PROJET, appelés en `../../` :
-    # `CLAUDE_PROJECT_DIR` vaut alors `Splide/agents/Splide OPS`, qui n'a pas de
+    # `CLAUDE_PROJECT_DIR` vaut alors `<projet>/agents/<projet> OPS`, qui n'a pas de
     # `.claude/hooks/`. Chercher là uniquement rendait l'import muet — et comme
     # ce hook est fail-open, il n'aurait RIEN fait, sans le dire. On cherche donc
     # aussi à côté de ce fichier, puis à la racine du dépôt.
@@ -393,18 +407,18 @@ def main():
                 sortie(2,
                     "attente : tu as modifié du code (%s) sans mettre "
                     "`.mind/todo.md` à jour. Ce fichier est le SEUL endroit où "
-                    "Maxime voit ce qui lui revient — il le lit depuis son "
+                    "le commanditaire voit ce qui lui revient — il le lit depuis son "
                     "iPhone, pas dans cette conversation.\n\n"
                     "Avant de rendre la main : coche ce que tu as fini, et "
                     "écris ce qui l'attend, une entrée par blocage, dans cette "
                     "forme exacte :\n\n"
-                    "- [ ] !haut @maxime **Autoriser le paiement en ligne**\n"
+                    "- [ ] !haut @user **Autoriser le paiement en ligne**\n"
                     "      Sans ça la boutique ne peut pas encaisser ; toi seul "
                     "peux signer le contrat.\n"
                     "      J'ai continué sur le reste ; ça attend depuis 4 jours.\n\n"
                     "Trois choses et rien d'autre : ce que tu lui demandes, "
                     "pourquoi ce ne peut être que lui, ce qui se passe s'il ne "
-                    "répond pas. Maxime est CEO — PAS de nom de fichier, de "
+                    "répond pas. Le commanditaire est CEO — PAS de nom de fichier, de "
                     "fonction ni de variable d'environnement.\n\n"
                     "Tu ne t'arrêtes pas pour autant : si tu peux avancer par un "
                     "chemin réversible, prends-le, note l'hypothèse, et continue."
@@ -413,7 +427,7 @@ def main():
 
     agent = nom_agent(racine)
 
-    # --- 1 bis. CE QUE MAXIME A TRANCHÉ REVIENT À L'AGENT --------------------
+    # --- 1 bis. CE QUE L'UTILISATEUR A TRANCHÉ REVIENT À L'AGENT --------------------
     # C'est la moitié qui manquait à tout le dispositif : un rappel coché est
     # une décision prise, et personne ne la redescendait. On la lit à chaque
     # tour — même quand le todo n'a pas bougé — et on renvoie l'agent au
@@ -427,7 +441,7 @@ def main():
         if neufs:
             vus.write_text("\n".join(sorted(set(coches) | deja)))
             sortie(2,
-                "attente : Maxime a tranché %d point(s) depuis ses Rappels.\n\n%s\n\n"
+                "attente : Le commanditaire a tranché %d point(s) depuis ses Rappels.\n\n%s\n\n"
                 "Ouvre le rappel pour lire sa réponse s'il en a écrit une dans le "
                 "corps, applique la décision, puis coche la tâche correspondante "
                 "dans `.mind/todo.md` (`- [x]`). Si tu ne peux pas l'appliquer "
@@ -435,10 +449,10 @@ def main():
                 "sans trace : de son côté, il l'a considérée comme réglée."
                 % (len(neufs), "\n".join("  ✓ " + t for t in neufs)))
 
-    # --- 1 ter. CE QUE MAXIME TE DEMANDE, LUI -------------------------------
+    # --- 1 ter. CE QUE L'UTILISATEUR TE DEMANDE, LUI -------------------------------
     # Un rappel sans pastille est de sa main : il a écrit dans ta liste depuis
     # son téléphone. C'est le canal descendant, celui que portait le dossier
-    # `Splide` de ses notes. On ne bloque qu'une fois par demande.
+    # `<projet>` de ses notes. On ne bloque qu'une fois par demande.
     if demandes:
         vus = ETAT / ("%s.demandes" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
         deja = set(vus.read_text().splitlines()) if vus.exists() else set()
@@ -446,14 +460,14 @@ def main():
         if neuves:
             vus.write_text("\n".join(sorted(set(demandes) | deja)))
             sortie(2,
-                "attente : Maxime t'a écrit %d demande(s) dans tes Rappels.\n\n%s\n\n"
+                "attente : Le commanditaire t'a écrit %d demande(s) dans tes Rappels.\n\n%s\n\n"
                 "Ouvre le rappel : le corps peut porter le détail. Traite-la, ou "
                 "porte-la dans `.mind/todo.md` si elle demande du temps — puis "
                 "COCHE le rappel pour lui dire que tu l'as prise. Ne le laisse pas "
                 "sans réponse : de son côté, il ne sait pas si tu l'as vue."
                 % (len(neuves), "\n".join("  → " + d for d in neuves)))
 
-    # --- 2. composer ce qui attend Maxime ------------------------------------
+    # --- 2. composer ce qui attend le commanditaire ------------------------------------
     # 0,4 s par appel AppleScript, mesuré : trop pour être payé à chaque tour,
     # d'où la garde sur le `mtime` du todo.
     empreinte = "%.0f" % todo.stat().st_mtime
@@ -478,7 +492,7 @@ def main():
     # mais jamais faux.
     attente = []
     for i, t in enumerate(taches):
-        if t.get("qui") != "maxime" or t.get("etat") != "afaire":
+        if t.get("qui") not in DESTINATAIRES or t.get("etat") != "afaire":
             continue
         t = dict(t)
         if i < len(bruts) and len(bruts) == len(taches):
@@ -488,7 +502,7 @@ def main():
         attente.append(t)
 
     # --- 3. les Rappels : une vraie case à cocher par décision ---------------
-    # LA NOTE ICLOUD A ÉTÉ RETIRÉE LE 06/09/2026, et c'est Maxime qui l'a vu :
+    # LA NOTE ICLOUD A ÉTÉ RETIRÉE LE 06/09/2026, et c'est le commanditaire qui l'a vu :
     # dès lors que le rappel porte le titre, l'explication (son corps), la
     # priorité et une VRAIE case, la note ne faisait plus que dupliquer — avec
     # un rendu inférieur, puisque Notes force le corps à 11 px et ne sait pas
@@ -517,9 +531,9 @@ def main():
     # un rappel coché : c'est la trace de sa décision, à lui de la ranger.
     # La liste n'appartient qu'à cet agent : plus besoin de filtrer sur un
     # préfixe. Un rappel coché n'est jamais purgé — c'est la trace de la
-    # décision de Maxime, à lui de la ranger.
+    # décision du commanditaire, à lui de la ranger.
     # NE PURGER QUE CE QUE L'AGENT A ÉCRIT — d'où le test sur la pastille. Sans
-    # lui, un rappel écrit par Maxime (qui n'en porte pas, et n'est donc jamais
+    # lui, un rappel écrit par le commanditaire (qui n'en porte pas, et n'est donc jamais
     # dans `voulus`) serait effacé au tour suivant : sa demande disparaîtrait
     # sans laisser de trace. Attrapé par le test du canal descendant.
     aOter = [lib for lib, fait in existants.items()

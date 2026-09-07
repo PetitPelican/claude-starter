@@ -11,7 +11,7 @@ n'est donc pas décoratif :
     !haut · !moyen · !bas          @<qui> · @dehors
 
 - **`@<qui>` est le marqueur le plus important du fichier.** Il nomme la
-  personne — `@humain`, un prénom, celui qu'on veut — dont la décision manque,
+  personne — `@user`, un prénom, celui qu'on veut — dont la décision manque,
   et c'est ce qui remonte **en premier** dans tout point d'avancement, parce que
   c'est la seule chose qui ne se délègue pas.
   `@dehors` est le seul nom réservé : il marque ce qui attend un tiers hors de
@@ -29,6 +29,6 @@ n'est donc pas décoratif :
 
 ## Chantiers
 
-- [ ] !haut @humain [LA_PREMIÈRE_DÉCISION_QUI_BLOQUE]
+- [ ] !haut @user [LA_PREMIÈRE_DÉCISION_QUI_BLOQUE]
 - [ ] !moyen [LE_PREMIER_TRAVAIL_QUI_NE_DÉPEND_DE_PERSONNE]
 - [ ] !bas [CE_QUI_PEUT_ATTENDRE]

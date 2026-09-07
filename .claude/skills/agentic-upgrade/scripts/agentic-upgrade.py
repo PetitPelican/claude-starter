@@ -23,7 +23,7 @@ Projet **déjà** au harnais, à remettre au niveau : c'est `agentic-sync`.
 """
 import argparse, json, pathlib, shutil, subprocess, tempfile, uuid
 
-DEPOT = "https://github.com/PetitPelican/claude-starter.git"
+DEPOT = "https://github.com/<compte>/claude-starter.git"
 
 # Références obsolètes réécrites dans les fichiers de doc du projet.
 # `.claude/memory/` était l'emplacement de la mémoire avant `docs/`.

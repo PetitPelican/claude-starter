@@ -61,7 +61,7 @@ PROJET_POSSEDE = (
     "la MACHINE (`brew install rtk` puis `rtk init -g`), pas dans le dépôt",
 )
 
-DEPOT = "https://github.com/PetitPelican/claude-starter.git"
+DEPOT = "https://github.com/<compte>/claude-starter.git"
 
 
 def different(a: pathlib.Path, b: pathlib.Path) -> bool:
@@ -91,7 +91,7 @@ class Rapport:
 def _a_miroiter(racine: pathlib.Path):
     """Les fichiers d'un côté du miroir, sans les artefacts locaux.
 
-    MESURÉ le 06/09/2026 en resynchronisant Splide Studio : le miroir parcourt
+    MESURÉ le 06/09/2026 en resynchronisant <projet> Studio : le miroir parcourt
     le SYSTÈME DE FICHIERS, pas git. Le starter gitignore `__pycache__/`, donc
     ses `.pyc` n'y sont que des résidus d'exécution des hooks — et le sync les
     recopiait quand même dans le projet, du bytecode compilé pour la version de

@@ -19,13 +19,13 @@ chacun porte la panne mesurée qui l'a fait écrire._
   agent** : à la racine en mono-agent, dans `agents/<nom>/` dès qu'il y en a
   plusieurs. Jamais de `.mind/` à la racine d'un projet multi-agents : personne
   n'y travaillerait pour le tenir.
-- **Ce qui est caché est du harnais, ce qui est visible est pour Maxime.**
+- **Ce qui est caché est du harnais, ce qui est visible est pour le commanditaire.**
   `.fact/`, `.mind/`, `.logs/` sont pointés ; `docs/` ne l'est pas. Cette
   mémoire ne sert pas d'abord à l'agent.
 - **`docs/` ne contient que de l'écrit à la main.** Toute sortie de build va
   ailleurs (`site/` pour le site rendu). Sans cette règle, on ne distingue plus
   la vérité tenue à la main de ce qui se régénère.
-- **`.fact/` ne s'écrit qu'à la demande de Maxime.** `mind-guard` refuse un
+- **`.fact/` ne s'écrit qu'à la demande du commanditaire.** `mind-guard` refuse un
   commit qui y touche sans ` # fact-ok` en fin de commande. Raison : c'est la
   seule mémoire partagée par tous les agents, et un agent qui la réécrit depuis
   son lot efface le travail d'un autre sans que personne ne le voie.
@@ -43,7 +43,7 @@ chacun porte la panne mesurée qui l'a fait écrire._
   en mode `bypassPermissions`. Et seules les règles `Edit(...)` sont évaluées :
   `Write(...)` est inerte.
 - **Deux agents d'un même projet ne portent jamais des noms qui se slugifient
-  pareil.** `Splide OPS` et `Splide-OPS` donnent la même adresse de mémoire
+  pareil.** `<projet> OPS` et `<projet>-OPS` donnent la même adresse de mémoire
   auto : ce serait deux agents partageant une seule mémoire, en silence.
 - **Aucune phrase du `CLAUDE.md` du projet n'est reprise dans celui d'un
   agent.** Le test : si elle resterait vraie pour un autre agent, elle est à

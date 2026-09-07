@@ -58,7 +58,7 @@ L'utilisateur définit le "quoi" et le "pourquoi", tu décides du "comment" et t
 
 ## Mémoire projet
 
-La mémoire tient en **trois dossiers, trois natures**, séparés par le nombre d'écrivains. `.fact/` porte les **faits du projet** — exactement quatre fichiers (`base`, `architecture`, `stack`, `rules`), un seul écrivain pour tout le projet, écrits à la demande de Maxime. `.mind/` porte l'**état d'un agent** — `state` et `todo`, un jeu par agent. `docs/` garde les **traces datées** et la matière du domaine, et s'accumule. Les tests qui tranchent : « on a décidé de » ou une date au passé → `docs/` ; ce qui resterait vrai pour un autre agent → `.fact/` ; ce que cet agent seul tient → `.mind/`.
+La mémoire tient en **trois dossiers, trois natures**, séparés par le nombre d'écrivains. `.fact/` porte les **faits du projet** — exactement quatre fichiers (`base`, `architecture`, `stack`, `rules`), un seul écrivain pour tout le projet, écrits à la demande du commanditaire. `.mind/` porte l'**état d'un agent** — `state` et `todo`, un jeu par agent. `docs/` garde les **traces datées** et la matière du domaine, et s'accumule. Les tests qui tranchent : « on a décidé de » ou une date au passé → `docs/` ; ce qui resterait vrai pour un autre agent → `.fact/` ; ce que cet agent seul tient → `.mind/`.
 
 **Si ce projet porte plusieurs agents**, ils vivent dans `agents/<nom>/`, chacun
 avec son `CLAUDE.md` de rôle, son `.claude/settings.json` et son `.mind/`. Ce

@@ -17,7 +17,7 @@ CE QU'IL NE FAIT PAS
       haut, le rôle descend, et seul un humain sait où passe la ligne. Le
       script pose le fichier de rôle et dit quoi y mettre.
     - Il ne supprime pas l'ancienne mémoire auto : il la marque `.migre-<date>`.
-      Précédent du 04/09/2026, renommage TrimTennis -> Splide Studio.
+      Précédent du 04/09/2026, renommage TrimTennis -> <projet> Studio.
     - Il ne touche pas à `.fact/`, `docs/`, `.logs/` ni au code : rien de tout
       ça n'appartient à un agent.
 
@@ -25,8 +25,8 @@ LE PIÈGE QU'IL EXISTE POUR ÉVITER. La mémoire auto d'un agent est classée pa
 CHEMIN (`~/.claude/projects/<chemin-slugifié>/`). Convertir déplace le `cwd` de
 l'agent de `<projet>/` vers `<projet>/agents/<nom>/` : sans migration, l'agent
 repart sur une adresse neuve et vide, et `--resume` ne retrouve plus rien. Au
-04/09/2026 ça représentait 428 Mo et 20 fils pour Stride, 58 Mo et 31 mémoires
-pour ceo.
+04/09/2026 ça représentait 428 Mo et 20 fils pour <projet>, 58 Mo et 31 mémoires
+pour <cto>.
 
 **Dry-run par défaut.** `--apply` pour écrire.
 """
@@ -55,7 +55,7 @@ personne de toucher au backend ; la frontière qui tient est celle écrite en
 def slug(p):
     """Mesuré le 04/09/2026 contre `~/.claude/projects/` : tout ce qui n'est
     pas alphanumérique devient un tiret. Vérifié sur six dossiers réels, dont
-    un à espace (`Splide Studio`)."""
+    un à espace (`<projet> Studio`)."""
     return re.sub(r"[^A-Za-z0-9]+", "-", str(p))
 
 
@@ -87,7 +87,7 @@ def reglages_agent(sources, cible, projet, autres, appliquer, rap):
     les agents NEUFS pointaient sur un `settings.agent.json.example` que presque
     aucun projet ne porte — ils naissaient donc sans hook, sans `defaultMode`, et
     le rapport annonçait quand même « hooks en ../../ ». Relevé sur la
-    conversion réelle de Splide : `Splide PO` est né avec 7 lignes de JSON."""
+    conversion réelle de <projet> : `<projet> PO` est né avec 7 lignes de JSON."""
     src = next((s for s in sources if s and s.is_file()), None)
     d = json.loads(src.read_text(encoding="utf-8")) if src else {}
     for blocs in d.get("hooks", {}).values():
@@ -133,9 +133,9 @@ def reglages_agent(sources, cible, projet, autres, appliquer, rap):
 
 def porte_les_non_herites(projet, cible, appliquer, rap):
     """`.mcp.json` et `settings.local.json` ne remontent PAS depuis un dossier
-    d'agent — mesuré le 04/09/2026 sur la conversion de Splide, horodatage à
+    d'agent — mesuré le 04/09/2026 sur la conversion de <projet>, horodatage à
     l'appui : un agent démarré dans `agents/<nom>/` ne voyait AUCUN des serveurs
-    MCP du projet. Pour `Splide OPS`, dont tout le lot est `supabase/` et
+    MCP du projet. Pour `<projet> OPS`, dont tout le lot est `supabase/` et
     `packages/db`, ça voulait dire travailler sans le serveur Supabase.
 
     Ni l'un ni l'autre n'est suivi par git : on copie, on ne déplace pas, et la

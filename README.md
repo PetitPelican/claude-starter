@@ -65,7 +65,7 @@ Puis coller ceci :
 Monte l'atelier agentique sur cette machine.
 
 1. Clone le starter à côté, PAS ici :
-   git clone https://github.com/PetitPelican/claude-starter.git /tmp/claude-starter
+   git clone https://github.com/<compte>/claude-starter.git /tmp/claude-starter
 
 2. Lis /tmp/claude-starter/.claude/skills/agentic-init/SKILL.md et suis-le.
    Racine = ce dossier, CTO = `cto` en minuscules, utilisateur = <prénom>.
@@ -99,7 +99,7 @@ raison qui fait qu'il n'existe pas de version « pour humains » du socle.
 ### À la main
 
 ```bash
-git clone https://github.com/PetitPelican/claude-starter.git /tmp/claude-starter
+git clone https://github.com/<compte>/claude-starter.git /tmp/claude-starter
 python3 /tmp/claude-starter/.claude/skills/agentic-init/scripts/agentic-init.py \
         --racine ~/Agentic --cto cto --utilisateur <prénom>
 # lire le rapport, puis relancer avec --apply
@@ -181,7 +181,7 @@ redécouvrir :
 **1. Cloner dans le projet**
 
 ```bash
-git clone https://github.com/PetitPelican/claude-starter.git .
+git clone https://github.com/<compte>/claude-starter.git .
 ```
 
 **2. Recharger l'éditeur** — `Shift + Ctrl + P` → **Developer: Reload Window**,
@@ -218,7 +218,7 @@ Le skill vivant dans `.claude/`, il faut amorcer le harnais d'abord :
 
 ```bash
 # macOS / Linux
-git clone https://github.com/PetitPelican/claude-starter.git /tmp/claude-starter
+git clone https://github.com/<compte>/claude-starter.git /tmp/claude-starter
 cp -r /tmp/claude-starter/.claude ./
 rm -rf /tmp/claude-starter
 # recharge l'éditeur, puis dans Claude Code : /agentic-upgrade
@@ -226,7 +226,7 @@ rm -rf /tmp/claude-starter
 
 ```powershell
 # Windows PowerShell
-git clone https://github.com/PetitPelican/claude-starter.git $env:TEMP\claude-starter
+git clone https://github.com/<compte>/claude-starter.git $env:TEMP\claude-starter
 Copy-Item -Recurse "$env:TEMP\claude-starter\.claude" ".\.claude"
 Remove-Item -Recurse -Force "$env:TEMP\claude-starter"
 # recharge (Shift+Ctrl+P → Developer: Reload Window), puis : /agentic-upgrade
@@ -365,7 +365,7 @@ Ce qui les sépare n'est pas le sujet, c'est **le nombre d'écrivains**.
 
 **`.fact/`** — les **faits du projet**, en **exactement quatre fichiers**. Un
 seul écrivain pour tout le projet ; les agents n'y touchent qu'à la demande de
-Maxime. Le texte périmé s'y **remplace**, il ne s'ajoute pas.
+Le commanditaire. Le texte périmé s'y **remplace**, il ne s'ajoute pas.
 
 - `.fact/base.md` — en-tête `cap`, la nature du projet et où il va _(public)_
 - `.fact/architecture.md` — domaine, frontières, couches, flux, pièges _(public)_
@@ -382,7 +382,7 @@ racine en mono-agent, dans `agents/<nom>/` quand le projet en porte plusieurs.
 
 **`docs/`** garde les **traces datées** et la matière du domaine, et s'accumule
 sans plafond. C'est le seul des trois qui n'est pas caché : **ce qui est caché
-est du harnais, ce qui est visible est pour Maxime.**
+est du harnais, ce qui est visible est pour le commanditaire.**
 
 - `docs/README.md` — l'index des trois dossiers
 - `docs/decisions.md` — le journal des décisions, *append-only* _(public curé)_

@@ -17,6 +17,18 @@ description: >
 Sur un projet mono il convertit ; sur un projet déjà multi il ajoute. Les deux
 sont la même opération à une étape près.
 
+> **Avant de découper, lire [`references/roles.md`](references/roles.md).** Ce
+> skill pose la mécanique ; il ne choisit pas les rôles, et c'est ce choix qui
+> décide de tout le reste. On y trouve les trois rôles types et leurs
+> frontières, pourquoi découper par couche technique (back/front) est presque
+> toujours faux, ce que le modèle **ne** couvre pas, le seuil au-delà duquel un
+> agent seul ne suffit plus, et ce que le multi-agents coûte réellement.
+>
+> Deux points qui se paient longtemps s'ils sont ratés ici : **le nom d'un rôle
+> façonne le comportement de l'agent qui le porte**, et **chaque agent ajouté
+> augmente ce qui remonte vers l'humain** — qui reste le seul à pouvoir
+> débloquer un lot au profit d'un autre.
+
 À ne pas confondre avec deux voisins :
 
 | | |
@@ -62,11 +74,11 @@ tous les agents. La racine ne garde que `.claude/hooks/`, la source unique.
 **La mémoire auto est classée par CHEMIN.** Convertir déplace le `cwd` de
 l'agent de `<projet>/` vers `<projet>/agents/<nom>/`, donc change son slug :
 adresse neuve et vide, `--resume` qui ne retrouve rien. Au 04/09/2026 ça
-représentait 428 Mo et 20 fils pour Stride, 58 Mo et 31 mémoires pour ceo. Le
+représentait 428 Mo et 20 fils pour <projet>, 58 Mo et 31 mémoires pour <cto>. Le
 script migre, ou il refuse.
 
-Il refuse aussi deux noms qui se **slugifient pareil** (`Splide OPS` et
-`Splide-OPS`) : ils partageraient une seule mémoire auto, en silence, et c'est
+Il refuse aussi deux noms qui se **slugifient pareil** (`<projet> OPS` et
+`<projet>-OPS`) : ils partageraient une seule mémoire auto, en silence, et c'est
 irrattrapable une fois installé.
 
 Et il refuse si les hooks du projet sont d'avant le 04/09/2026 : un `briefing`
@@ -81,7 +93,7 @@ python3 .claude/skills/agentic-sync/scripts/migre-fact-docs.py --project-root . 
 
 # 2. à blanc, toujours — le premier nommé hérite de l'état existant
 python3 .claude/skills/agentic-agents/scripts/agentic-agents.py \
-        --project-root . --agents "Splide OPS,Splide PO"
+        --project-root . --agents "OPS,PO"
 
 # 3. appliquer
 … --apply

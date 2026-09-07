@@ -267,7 +267,7 @@ def scanne(racine: pathlib.Path, un_seul=""):
         h = harnais(d)
         _f, _etats = forme(d)
         # Une seule voix : l'état le plus en difficulté, et les tâches réunies.
-        # À plusieurs agents, ce qui attend Maxime ne se range pas par agent.
+        # À plusieurs agents, ce qui attend le commanditaire ne se range pas par agent.
         e, t = {}, []
         for _n, _m in _etats:
             _e = entete(lis(_m / "state.md"))

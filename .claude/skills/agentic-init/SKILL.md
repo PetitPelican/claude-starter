@@ -54,11 +54,11 @@ projet.
 **1. Amorcer.** Le skill vit dans le starter : il faut donc le starter d'abord.
 
 ```bash
-git clone https://github.com/PetitPelican/claude-starter.git /tmp/claude-starter
+git clone https://github.com/<compte>/claude-starter.git /tmp/claude-starter
 ```
 
 ```powershell
-git clone https://github.com/PetitPelican/claude-starter.git $env:TEMP\claude-starter
+git clone https://github.com/<compte>/claude-starter.git $env:TEMP\claude-starter
 ```
 
 **2. Dry-run**, depuis n'importe où :

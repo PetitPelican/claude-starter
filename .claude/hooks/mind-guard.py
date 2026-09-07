@@ -19,7 +19,7 @@ Deux changements, et chacun corrige une panne réelle :
 3. LE TODO A QUITTÉ CE HOOK (06/09/2026). `.mind/todo.md` était exigé ici lui
    aussi ; il appartient désormais à `attente.py`, hook `Stop`, qui se
    déclenche à chaque fin de tour. Sur `commit`, un agent qui analyse ou qui
-   est bloqué maintenant n'écrivait rien : ce qui attend Maxime n'arrivait
+   est bloqué maintenant n'écrivait rien : ce qui attend le commanditaire n'arrivait
    qu'au prochain commit, parfois jamais. Un instantané (`state.md`) se pose
    à un jalon, une alerte (`todo.md`) ne peut pas attendre le jalon suivant.
 
@@ -32,7 +32,7 @@ silence se lit comme une absence de problème.
 Contrat repris **du parseur**, pas de mémoire (`claude-projets`, v. 03/09/2026) :
   - en-tête : `---\n…\n---` en tête de `.mind/state.md`, YAML plat
   - champs lus : maj, cap, sante, jalon, balle, depuis, attente, suivant
-  (le dialecte des tâches — `- [ ] Libellé`, `!haut`, `@maxime` — est passé
+  (le dialecte des tâches — `- [ ] Libellé`, `!haut`, `@user` — est passé
   avec le todo dans `attente.py`.)
 
 Échappatoire : ` # mind-ok` à la fin de la commande.
@@ -198,7 +198,7 @@ def verifie_state(texte, champs=CHAMPS_REQUIS):
 # qu'à un jalon — le commit en est un. Le partage est donc net :
 #
 #     mind-guard (commit)  ->  .mind/state.md   où en est le projet
-#     attente    (Stop)    ->  .mind/todo.md    ce qui attend Maxime
+#     attente    (Stop)    ->  .mind/todo.md    ce qui attend le commanditaire
 #     journal    (commit)  ->  .logs/<jour>.md  ce qui a été fait
 
 
@@ -217,7 +217,7 @@ def main():
     # protègent pas la même chose : « ma déclaration d'agent n'a pas à bouger »
     # désarmait aussi la garde de la mémoire PARTAGÉE du projet. Chaque
     # échappatoire est désormais testée devant la règle qu'elle lève, et pas
-    # avant. Repéré par `Splide OPS` en franchissant le trou en connaissance
+    # avant. Repéré par `<projet> OPS` en franchissant le trou en connaissance
     # de cause, ce qui est la bonne façon de le signaler.
     lot, projet, faits = contexte()
     state, todo = lot + ".mind/state.md", lot + ".mind/todo.md"
@@ -230,7 +230,7 @@ def main():
     if not fichiers:
         allow()  # `git commit --amend`, commit vide… : rien à juger
 
-    # 0. `.fact/` NE S'ÉCRIT QU'À LA DEMANDE DE MAXIME. C'est la seule mémoire
+    # 0. `.fact/` NE S'ÉCRIT QU'À LA DEMANDE DE L'UTILISATEUR. C'est la seule mémoire
     # partagée par tous les agents d'un projet : un agent qui la réécrit depuis
     # son lot efface ce qu'un autre y avait mis, et personne ne le voit. La
     # règle existait en prose ; ici elle devient vérifiable, et l'autorisation
@@ -240,8 +240,8 @@ def main():
         if touches:
             deny("mind-guard : ce commit modifie `.fact/` (%s). Ces fichiers "
                  "sont partagés par TOUS les agents du projet et ne s'écrivent "
-                 "qu'à la demande de Maxime — un agent qui les réécrit depuis "
-                 "son lot efface le travail d'un autre en silence. Si Maxime "
+                 "qu'à la demande du commanditaire — un agent qui les réécrit depuis "
+                 "son lot efface le travail d'un autre en silence. Si le commanditaire "
                  "l'a demandé, ajoute ` # fact-ok` à la fin de la commande : "
                  "l'autorisation restera dans l'historique."
                  % (", ".join(touches[:4]) + (", …" if len(touches) > 4 else "")))

@@ -47,7 +47,7 @@ CACHES = {
     "DerivedData":    "refait seul au prochain build Xcode",
     # Swift Package Manager. Absent de la première version de cette liste, et
     # c'est un agent de projet qui l'a trouvé en mesurant à la main : 192 Mo
-    # invisibles dans `ios/SplideStudioCore/.build`. Une liste de noms de
+    # invisibles dans `ios/<Module>Core/.build`. Une liste de noms de
     # caches ne se devine pas, elle se corrige sur le terrain.
     ".build":         "refait seul au prochain `swift build`",
     "Pods":           "pod install",
