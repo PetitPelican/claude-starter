@@ -420,25 +420,12 @@ on run argv
     set faits to (name of (every reminder of list nomListe whose completed is true)) as text
     set ouverts to (name of (every reminder of list nomListe whose completed is false)) as text
     set AppleScript's text item delimiters to anciensDelims
-    -- LE CORPS, pour y lire ce que le commanditaire a ÉCRIT. Une case cochée
-    -- dit « j'ai tranché » ; elle ne dit pas LAQUELLE des trois voies, ni
-    -- pourquoi. Les notes sont le seul champ libre qu'un rappel expose —
-    -- mesuré le 07/09/2026 : ni sous-tâche, ni position, ni rang.
-    -- DEUX REQUÊTES ET UNE BOUCLE LOCALE, jamais une boucle QUI INTERROGE.
-    -- Première écriture le 08/09/2026 : `repeat with r in (every reminder …
-    -- whose …)` réévalue le filtre à chaque tour et a dépassé les 40 s du hook.
-    -- Le même piège que le 06/09, qui avait fait passer ce fichier de 5,8 s à
-    -- 1,1 s. Ici on rapatrie les deux listes d'un coup, puis on assemble hors
-    -- de toute requête Apple Events.
-    set nomsL to name of (every reminder of list nomListe whose completed is false)
-    set corpsL to body of (every reminder of list nomListe whose completed is false)
-    set corps to ""
-    repeat with i from 1 to (count of nomsL)
-      set b to item i of corpsL
-      if b is missing value then set b to ""
-      set corps to corps & (item i of nomsL) & "\x1f" & b & "\x1e"
-    end repeat
-    return faits & "\x1e" & ouverts & "\x1d" & corps
+    -- LES CORPS NE SONT PLUS LUS. Ils l'ont été une heure, le 08/09/2026,
+    -- quand la réponse s'écrivait dans les notes : 7,9 s par appel contre 1,1 s
+    -- ici, sur les 40 s du hook. La réponse vit maintenant dans le titre, qui
+    -- est déjà rapatrié — le raccourci pour le commanditaire a rendu la mesure
+    -- sept fois moins chère.
+    return faits & "\x1e" & ouverts
   end tell
 end run
 '''
@@ -453,23 +440,36 @@ end run
 # son titre, ses notes, sa priorité, son marquage et ses dates — ni sous-tâche
 # (qui aurait donné la réponse en UN geste), ni position, ni rang. On écrit
 # donc l'invite à la fin des notes, et on relit ce qui la suit.
-MARQUE = "▸ Ta réponse :"
-INVITE = "\n\n" + MARQUE + " "
+# DANS LE TITRE, PAS DANS LES NOTES. Première écriture le 08/09/2026 dans le
+# corps du rappel : il faut ouvrir le rappel, faire défiler l'explication, puis
+# taper. Le commanditaire l'a essayé et a demandé le titre — « c'est plus rapide
+# et plus visuel ». Il a raison : le titre se voit sans ouvrir, et se modifie
+# d'une frappe depuis la liste.
+#
+# CE QUE ÇA COÛTE, ET QU'IL FAUT TENIR : le titre est la CLÉ de tout le
+# dispositif — création, purge, remise en ordre, doublons. Un titre édité par le
+# commanditaire ne serait plus reconnu, donc considéré comme périmé, donc
+# EFFACÉ : sa réponse disparaîtrait en même temps qu'il la donne. D'où
+# `base_reponse()`, par où passe TOUT titre venu de Rappels avant d'être comparé.
+MARQUE = " · Ta réponse :"
 
 
-def reponses(corps_par_titre):
-    """{titre: ce que le commanditaire a écrit après l'invite}, non vide seul.
+def base_reponse(titre):
+    """(le titre tel que l'agent l'a écrit, ce que le commanditaire a ajouté)."""
+    titre = (titre or "").strip()
+    if MARQUE not in titre:
+        return titre, ""
+    base, _, rep = titre.partition(MARQUE)
+    return base.strip(), rep.strip()
 
-    Tout ce qui suit la marque est à lui, et rien d'autre ne l'est : c'est ce
-    qui permet de distinguer sa réponse du texte que l'agent a lui-même écrit,
-    sans garder d'état ni comparer à une version antérieure."""
+
+def reponses(titres):
+    """{titre de l'agent: ce que le commanditaire a écrit après la marque}."""
     out = {}
-    for titre, corps in (corps_par_titre or {}).items():
-        if MARQUE not in (corps or ""):
-            continue
-        rep = corps.split(MARQUE, 1)[1].strip()
+    for titre in (titres or []):
+        base, rep = base_reponse(titre)
         if rep:
-            out[titre] = rep
+            out[base] = rep
     return out
 
 
@@ -481,7 +481,12 @@ def rappels_actuels(liste):
     for l in (brut or "").splitlines():
         if "\t" in l:
             etat, titre = l.split("\t", 1)
-            out[titre.strip()] = (etat.strip() == "1")
+            reel = titre.strip()
+            base, _rep = base_reponse(reel)
+            # RANGÉ SOUS LE TITRE DE L'AGENT, mais on garde le titre RÉEL : lui
+            # seul permet d'effacer le rappel, et il diffère dès que le
+            # commanditaire a répondu dedans.
+            out[base] = (etat.strip() == "1", reel)
     return out
 
 
@@ -507,32 +512,15 @@ def rappels_etat(liste, cache_s=60):
     brut = _osa(RAPPELS_ETAT, liste)
     if brut is None:
         return [], [], {}
-    brut, _, bloc_corps = brut.partition("\x1d")
-    corps = {}
-    for c in bloc_corps.split(SEP_LOT):
-        if SEP_CHAMP in c:
-            nom, _, b = c.partition(SEP_CHAMP)
-            nom = nom.strip()
-            # DES TITRES SE RÉPÈTENT. Mesuré le 08/09/2026 sur la liste du CTO :
-            # 151 rappels ouverts pour 61 titres distincts. Ranger par titre
-            # écrasait donc les doublons — et si la réponse était dans l'un des
-            # écrasés, elle disparaissait sans bruit. On garde celui qui porte
-            # une réponse ; à défaut le plus complet.
-            if nom in corps and MARQUE not in b:
-                continue
-            if nom in corps and MARQUE in corps[nom] and MARQUE in b:
-                if len(corps[nom].split(MARQUE, 1)[1].strip()) >= len(b.split(MARQUE, 1)[1].strip()):
-                    continue
-            corps[nom] = b
     faits, _, ouverts = brut.partition(SEP_LOT)
-    val = ([l.strip() for l in faits.splitlines() if l.strip()],
+    lignes_ouvertes = [l.strip() for l in ouverts.splitlines() if l.strip()]
+    val = ([base_reponse(l)[0] for l in faits.splitlines() if l.strip()],
            # SANS PASTILLE = ÉCRIT PAR L'UTILISATEUR. L'agent préfixe toujours ses
            # rappels d'un 🔴🟠🟡 ; un rappel qui n'en porte pas vient donc de
            # lui. C'est ce qui remplace le canal descendant que portaient les
            # notes, et en mieux : c'est la même surface, dans les deux sens.
-           [l.strip() for l in ouverts.splitlines()
-            if l.strip() and l.strip()[0] not in "🔴🟠🟡"],
-           corps)
+           [l for l in lignes_ouvertes if l[0] not in "🔴🟠🟡"],
+           reponses(lignes_ouvertes))
     try:
         cache.write_text(json.dumps(val))
     except OSError:
@@ -840,7 +828,7 @@ def main():
     # tour — même quand le todo n'a pas bougé — et on renvoie l'agent au
     # travail pour qu'il la traite. Bornée par la même garde anti-boucle : au
     # plus un rappel par état, jamais d'agent coincé.
-    coches, demandes, corps_rappels = rappels_etat(agent)
+    coches, demandes, rep = rappels_etat(agent)
     if coches:
         vus = ETAT / ("%s.tranche" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
         deja = set(vus.read_text().splitlines()) if vus.exists() else set()
@@ -992,7 +980,6 @@ def main():
     # Cocher dit « j'ai tranché » ; écrire dit QUOI. Sans ce bloc, une question
     # à trois voies revenait à l'agent sans sa réponse — il savait qu'une
     # décision était prise et devait la deviner.
-    rep = reponses(corps_rappels)
     if rep:
         vus = ETAT / ("%s.reponses" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
         deja = set(vus.read_text().splitlines()) if vus.exists() else set()
@@ -1185,13 +1172,14 @@ def main():
     # aucune notion de tri dans son dictionnaire — donc on le prend de vitesse
     # en écrivant déjà trié.
     for t in sorted(attente, key=lambda x: RANG.get(x["prio"], 1)):
-        lib = libelle_rappel(t["titre"], t["prio"])[:250]
+        lib = libelle_rappel(t["titre"], t["prio"])[:250 - len(MARQUE)]
         voulus.add(lib)
         if lib not in existants:
             if not lib.strip():
                 continue
             aCreer.append(SEP_CHAMP.join(
-                (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " ") + INVITE,
+                (lib + MARQUE,
+                 (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " "),
                  str(PRIO_APPLE.get(t["prio"], 5)))))
     if aCreer:
         _osa(RAPPELS_ECRIRE, agent, SEP_LOT.join(aCreer))
@@ -1211,7 +1199,7 @@ def main():
     # avoir supprimé une partie, ce qui ressemble à un succès. En régime établi
     # la purge ne touche que ce que l'agent vient de régler, un à trois rappels ;
     # au-delà, c'est un rattrapage, et il se termine aux tours suivants.
-    aOter = sorted(lib for lib, fait in existants.items()
+    aOter = sorted(reel for lib, (fait, reel) in existants.items()
                    if lib not in voulus and not fait and lib[:1] in "🔴🟠🟡")[:8]
     if aOter:
         _osa(RAPPELS_SUPPRIMER, agent, SEP_LOT.join(aOter))
@@ -1233,15 +1221,23 @@ def main():
         par_lib = {}
         for t in attente:
             par_lib[libelle_rappel(t["titre"], t["prio"])[:250]] = t
-        ordre = [l for l in existants if l in voulus and not existants[l]]
-        ordre += [c.split(SEP_CHAMP)[0] for c in aCreer]
+        ordre = [l for l in existants if l in voulus and not existants[l][0]]
+        ordre += [base_reponse(c.split(SEP_CHAMP)[0])[0] for c in aCreer]
         rangs = [RANG.get(PASTILLE_RANG.get(l[:1], "moyen"), 1) for l in ordre]
         # le plus prioritaire qui reste APRÈS chaque position
         apres = [9] * (len(rangs) + 1)
         for i in range(len(rangs) - 1, -1, -1):
             apres[i] = min(rangs[i], apres[i + 1])
         malPlaces = [ordre[i] for i in range(len(rangs)) if apres[i + 1] < rangs[i]]
-        malPlaces = sorted(malPlaces, key=lambda l: RANG.get(PASTILLE_RANG.get(l[:1], "moyen"), 1))[:budget]
+        # LES RAPPELS D'AVANT LA MARQUE. Un rappel déjà en place et bien rangé
+        # ne serait jamais réécrit : il resterait sans « Ta réponse : » pour
+        # toujours, et le commanditaire n'aurait nulle part où répondre — c'est
+        # exactement ce qu'il a signalé sur les listes des agents Splide. On les
+        # met donc à niveau par le même mécanisme, au même budget.
+        sansMarque = [l for l, (fait, reel) in existants.items()
+                      if l in voulus and not fait and MARQUE not in reel]
+        malPlaces = sorted(dict.fromkeys(malPlaces + sansMarque),
+                           key=lambda l: RANG.get(PASTILLE_RANG.get(l[:1], "moyen"), 1))[:budget]
         if malPlaces:
             # NE RECRÉER QUE SI LA SUPPRESSION A RÉUSSI. Mesuré le 08/09/2026 :
             # la liste du CTO portait 151 rappels ouverts pour 13 questions, et
@@ -1251,7 +1247,8 @@ def main():
             # suivie d'une création qui passe fabrique un doublon, à chaque
             # tour, sans un mot. Le remède n'est pas d'allonger le délai : c'est
             # de ne pas créer quand on n'a pas pu effacer.
-            if _osa(RAPPELS_SUPPRIMER, agent, SEP_LOT.join(malPlaces)) is None:
+            reels = [existants[l][1] if l in existants else l for l in malPlaces]
+            if _osa(RAPPELS_SUPPRIMER, agent, SEP_LOT.join(reels)) is None:
                 malPlaces = []
             refaits = []
             for lib in malPlaces:
@@ -1259,7 +1256,8 @@ def main():
                 if not t or not lib.strip():
                     continue          # jamais un rappel sans titre : six en traînaient
                 refaits.append(SEP_CHAMP.join(
-                    (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " ") + INVITE,
+                    (lib + MARQUE,
+                     (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " "),
                      str(PRIO_APPLE.get(t["prio"], 5)))))
             if refaits:
                 _osa(RAPPELS_ECRIRE, agent, SEP_LOT.join(refaits))
