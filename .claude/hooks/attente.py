@@ -1188,6 +1188,8 @@ def main():
         lib = libelle_rappel(t["titre"], t["prio"])[:250]
         voulus.add(lib)
         if lib not in existants:
+            if not lib.strip():
+                continue
             aCreer.append(SEP_CHAMP.join(
                 (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " ") + INVITE,
                  str(PRIO_APPLE.get(t["prio"], 5)))))
@@ -1241,12 +1243,21 @@ def main():
         malPlaces = [ordre[i] for i in range(len(rangs)) if apres[i + 1] < rangs[i]]
         malPlaces = sorted(malPlaces, key=lambda l: RANG.get(PASTILLE_RANG.get(l[:1], "moyen"), 1))[:budget]
         if malPlaces:
-            _osa(RAPPELS_SUPPRIMER, agent, SEP_LOT.join(malPlaces))
+            # NE RECRÉER QUE SI LA SUPPRESSION A RÉUSSI. Mesuré le 08/09/2026 :
+            # la liste du CTO portait 151 rappels ouverts pour 13 questions, et
+            # « accès distant » y figurait trois fois. `_osa` est fail-open — il
+            # rend None sur échec ou dépassement, et huit suppressions coûtent
+            # ~16 s sur les 25 s qu'il s'accorde. Une suppression qui expire
+            # suivie d'une création qui passe fabrique un doublon, à chaque
+            # tour, sans un mot. Le remède n'est pas d'allonger le délai : c'est
+            # de ne pas créer quand on n'a pas pu effacer.
+            if _osa(RAPPELS_SUPPRIMER, agent, SEP_LOT.join(malPlaces)) is None:
+                malPlaces = []
             refaits = []
             for lib in malPlaces:
                 t = par_lib.get(lib)
-                if not t:
-                    continue
+                if not t or not lib.strip():
+                    continue          # jamais un rappel sans titre : six en traînaient
                 refaits.append(SEP_CHAMP.join(
                     (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " ") + INVITE,
                      str(PRIO_APPLE.get(t["prio"], 5)))))
