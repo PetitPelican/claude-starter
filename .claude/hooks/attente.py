@@ -19,12 +19,8 @@ DEUX CHOSES, DANS CET ORDRE :
      un récap. C'est une contrainte mécanique, pas une consigne de prose — la
      prose, on a mesuré qu'elle ne suffisait pas.
 
-  2. IL POUSSE vers le canal du commanditaire — par défaut la liste de rappels
-     du système, une par agent, qu'il lit depuis son téléphone. Le canal a
-     d'abord été une note ; les cases à cocher n'y survivaient pas à
-     l'écriture, et une liste de rappels en offre de vraies. C'est ce qui
-     rend la boucle bidirectionnelle : cocher une entrée renvoie la décision
-     à l'agent.
+  2. IL POUSSE vers la note iCloud de l'agent (dossier « agents »), que le commanditaire
+     lit depuis son iPhone.
 
 FAIL-OPEN PARTOUT, ET SILENCIEUX. Un hook de reporting ne doit jamais empêcher
 de travailler : toute erreur, tout doute, tout projet hors harnais sort en 0.
@@ -42,7 +38,7 @@ CE HOOK NE PARSE PAS LE DIALECTE. `chantiers()` de `claude-projets` est le
 lecteur de `todo.md` (`!haut`, `@user`, les états), et il est importé, jamais
 recopié : deux lecteurs du même format divergent au premier changement.
 """
-import sys, os, re, json, subprocess, pathlib, hashlib, datetime, unicodedata
+import sys, os, re, json, subprocess, pathlib, hashlib, datetime, time, unicodedata
 import importlib.machinery, importlib.util
 
 ETAT = pathlib.Path.home() / ".claude" / "attente"
@@ -129,16 +125,126 @@ def blocs_bruts(texte):
             courant = [re.sub(r"^\s*[-*]\s*\[( |x|X|>|~)\]\s+", "", l).strip()]
             blocs.append(courant)
         elif courant is not None and l.strip() and re.match(r"^\s+\S", l):
-            courant.append(l.strip())
+            # La ligne de réouverture est de la MÉCANIQUE : elle n'a rien à
+            # faire dans ce que lit le commanditaire, qui est CEO. Elle porte
+            # une commande shell — exactement ce que la consigne interdit.
+            if not l.lstrip().startswith("↻"):
+                courant.append(l.strip())
         elif not l.strip():
             courant = None
     out = []
     for b in blocs:
-        t = " ".join(b)
+        # Les lignes de continuation d'un libellé se recollent — un titre en
+        # gras court souvent sur deux lignes. Mais une ligne de RÉPONSE
+        # (`oui → …`) garde la sienne : sur un téléphone, trois réponses
+        # aplaties en un paragraphe redeviennent le pavé qu'on veut éviter.
+        t = b[0]
+        for l in b[1:]:
+            t += ("\n" if REPONSE.match(l) else " ") + l
         t = re.sub(r"!(haut|moyen|bas)\b", "", t, flags=re.I)
         t = re.sub(r"(?:^|(?<=\s))@[A-Za-zÀ-ÿ][\w-]*\b", "", t)
+        t = CONSTAT.sub("", t)      # `?constat` est un marqueur, pas du texte
         out.append(t)
     return out
+
+
+# ── LES CONSTATS ─────────────────────────────────────────────────────────
+# Un `todo.md` mélange deux natures que rien ne distinguait :
+#
+#   une TÂCHE      « construire ceci »  reste vraie jusqu'à ce qu'on la fasse
+#   un CONSTAT     « ceci manque »      peut cesser d'être vrai TOUT SEUL
+#
+# Trouvé par Splide PO le 07/09/2026 : sur seize points remis au commanditaire,
+# cinq étaient faux — et les deux plus coûteux n'étaient pas des oublis, mais
+# des constats mesurés proprement, datés, devenus faux deux jours plus tard sans
+# que rien ne le signale. Un constat bien mesuré n'est pas plus DURABLE qu'un
+# constat bâclé : seulement plus crédible, donc plus dangereux quand il périme.
+#
+# Le hook ne peut pas savoir si un constat est vrai. Il peut exiger qu'il porte
+# de quoi le rouvrir, et rejouer cette vérification au seul moment qui compte —
+# celui où le constat PART vers le commanditaire.
+#
+# LE MARQUEUR VIT DANS LE LIBELLÉ, et c'est ce qui rend l'ajout gratuit : le
+# dialecte est lu par quatre programmes, dont trois portent leur propre copie de
+# l'expression qui décode une ligne. Ces trois-là capturent la case et le
+# libellé EN BLOC — `?constat`, comme `!haut` et `@user` avant lui, leur est
+# invisible par construction.
+# Une ligne de réponse : « oui → … », « 2 → … ». Le libellé court à gauche de
+# la flèche est la réponse que le commanditaire donnera ; ce qui suit est ce
+# qu'elle DÉCLENCHE. Deux au moins, sinon ce n'est pas une question fermée.
+REPONSE = re.compile(r"^\s*\S[^→\n]{0,24}?\s*→\s*\S")
+
+CONSTAT = re.compile(r"(?:^|(?<=\s))\?constat\b", re.I)
+# `↻ machine|service :: commande :: motif attendu`
+#   La SOURCE est déclarée parce qu'elle est le second échec de PO : son
+#   contrôle décodait un cache local vieux de quatre jours au lieu d'interroger
+#   le service. Chiffre net, cohérent, reproductible — et hors sujet. Une mesure
+#   locale ne répond jamais à une question distante ; l'écrire oblige à y penser.
+REOUVRE = re.compile(r"^\s*↻\s*(machine|service)\s*::\s*(.+?)\s*::\s*(.+?)\s*$",
+                     re.I | re.M)
+
+TIENT, TOMBE, MUET = "TIENT", "TOMBÉ", "MUET"
+# Bornes dures : ce hook a 40 s avant d'être tué, et un tour qui pend est pire
+# qu'un constat périmé. Rejouer cent fois par jour ne rend pas un constat vrai —
+# ça reproduit cent fois la même erreur avec une confiance croissante.
+CONSTAT_MAX, CONSTAT_S, CONSTAT_BUDGET = 5, 10, 25
+
+
+def blocs_lignes(texte):
+    """Les blocs de tâches, lignes BRUTES — marqueurs compris.
+
+    `blocs_bruts()` recolle et nettoie pour l'affichage ; ici on a besoin du
+    texte tel qu'écrit, sinon la ligne `↻` disparaît avec le reste."""
+    blocs, courant = [], None
+    for l in texte.splitlines():
+        if re.match(r"^\s*[-*]\s*\[( |x|X|>|~)\]\s+", l):
+            courant = [l]
+            blocs.append(courant)
+        elif courant is not None and l.strip() and re.match(r"^\s+\S", l):
+            courant.append(l)
+        elif not l.strip():
+            courant = None
+    return ["\n".join(b) for b in blocs]
+
+
+def specs_constat(texte):
+    """Par tâche, dans l'ordre : None, ou ce qu'il faut pour la rouvrir."""
+    out = []
+    for b in blocs_lignes(texte):
+        if not CONSTAT.search(b):
+            out.append(None)
+            continue
+        m = REOUVRE.search(b)
+        out.append({"source": m.group(1).lower(), "cmd": m.group(2),
+                    "motif": m.group(3)} if m else {"sans": True})
+    return out
+
+
+def rejouer(spec, budget):
+    """TIENT · TOMBÉ · MUET — et jamais autre chose.
+
+    MUET est la trouvaille de PO et le cœur du dispositif : **un contrôle qui
+    n'aboutit pas ne doit JAMAIS se lire comme un constat confirmé.** Ça a servi
+    dès son premier essai — ses mesures répétées ont déclenché la limitation de
+    débit du site, et le contrôle a rendu MUET au lieu d'annoncer quatre routes
+    cassées."""
+    if budget <= 0:
+        return MUET, "budget de temps épuisé"
+    try:
+        r = subprocess.run(["bash", "-c", spec["cmd"]], capture_output=True,
+                           text=True, timeout=min(CONSTAT_S, budget))
+    except subprocess.TimeoutExpired:
+        return MUET, "la vérification n'a pas répondu à temps"
+    except Exception as e:
+        return MUET, "la vérification n'a pas pu être lancée (%s)" % type(e).__name__
+    if r.returncode == 127:
+        return MUET, "la commande de vérification n'existe pas"
+    sortie_ = (r.stdout or "") + (r.stderr or "")
+    try:
+        trouve = re.search(spec["motif"], sortie_, re.I | re.S) is not None
+    except re.error:
+        trouve = spec["motif"].strip() in sortie_
+    return (TIENT, "") if trouve else (TOMBE, "la vérification dit le contraire")
 
 
 def lisible(s):
@@ -442,13 +548,23 @@ def main():
                     "Avant de rendre la main : coche ce que tu as fini, et "
                     "écris ce qui l'attend, une entrée par blocage, dans cette "
                     "forme exacte :\n\n"
-                    "- [ ] !haut @user **Autoriser le paiement en ligne**\n"
-                    "      Sans ça la boutique ne peut pas encaisser ; toi seul "
-                    "peux signer le contrat.\n"
-                    "      J'ai continué sur le reste ; ça attend depuis 4 jours.\n\n"
-                    "Trois choses et rien d'autre : ce que tu lui demandes, "
-                    "pourquoi ce ne peut être que lui, ce qui se passe s'il ne "
-                    "répond pas. Le commanditaire est CEO — PAS de nom de fichier, de "
+                    "- [ ] !haut @user **J'autorise le paiement en ligne ? oui / non**\n"
+                    "      oui → la boutique encaisse dès lundi ; il me faut ta "
+                    "signature, 20 min.\n"
+                    "      non → on ouvre sans encaissement, les clients paient "
+                    "à la livraison.\n"
+                    "      Ça attend depuis 4 jours ; j'ai continué sur le reste.\n\n"
+                    "UNE QUESTION FERMÉE, JAMAIS UN CONSTAT. Un constat lui laisse "
+                    "tout le travail : comprendre ce qu'on lui demande, deviner "
+                    "comment répondre, et mesurer seul ce qu'il risque à ne pas "
+                    "répondre. Il doit trancher d'un mot, depuis son téléphone, "
+                    "sans rien ouvrir.\n\n"
+                    "Sous la ligne, une ligne par réponse possible — ce qu'elle "
+                    "DÉCLENCHE, pas ce qu'elle signifie. Trois voies : numérote-les, "
+                    "il répond « 2 ». Et si tu ne sais pas quoi faire de l'une des "
+                    "réponses, la question n'est pas prête : elle n'a rien à faire "
+                    "dans sa liste.\n\n"
+                    "Le commanditaire est CEO — PAS de nom de fichier, de "
                     "fonction ni de variable d'environnement.\n\n"
                     "Tu ne t'arrêtes pas pour autant : si tu peux avancer par un "
                     "chemin réversible, prends-le, note l'hypothèse, et continue."
@@ -529,7 +645,125 @@ def main():
             t["titre"], t["corps"] = titre_et_corps(bruts[i])
         else:
             t["titre"], t["corps"] = lisible(t["titre"]), ""
+        t["_i"] = i
         attente.append(t)
+
+    # --- 2 bis. LES CONSTATS : rouvrir avant de servir -----------------------
+    # Ici et nulle part ailleurs. Le hook tire à chaque fin de tour ; un contrôle
+    # réseau coûte des secondes. Le bon instant est celui où le constat ATTEINT
+    # le commanditaire — c'est rare, et c'est exactement le moment qui a échoué.
+    specs = specs_constat(texte)
+    manquants = [t for t in attente
+                 if t["_i"] < len(specs) and (specs[t["_i"]] or {}).get("sans")]
+    if manquants:
+        # Même garde anti-boucle que la règle 1 : au plus un blocage par état du
+        # todo. Un agent ne doit JAMAIS pouvoir être coincé par ce hook.
+        sig = hashlib.sha1(("constat|%s|%d" % (empreinte, len(manquants)))
+                           .encode()).hexdigest()[:16]
+        temoin = ETAT / ("%s.constat" % session)
+        if not (temoin.exists() and temoin.read_text().strip() == sig):
+            temoin.write_text(sig)
+            sortie(2,
+                "attente : %d constat(s) sans moyen d'être rouvert(s) : %s.\n\n"
+                "Un constat n'est pas une tâche. « Construire X » reste vrai "
+                "jusqu'à ce que tu le fasses ; « X manque » peut cesser d'être "
+                "vrai TOUT SEUL, sans que personne y touche — et un constat bien "
+                "mesuré n'est pas plus durable qu'un constat bâclé, seulement "
+                "plus crédible, donc plus dangereux quand il périme.\n\n"
+                "Ajoute sous chaque ligne `?constat` de quoi la rejouer :\n\n"
+                "      ↻ service :: curl -s -o /dev/null -w '%%{http_code}' "
+                "https://exemple.fr/contact :: ^200$\n\n"
+                "Trois champs. D'ABORD LA SOURCE — `machine` si la réponse est "
+                "sur ce poste, `service` si elle est chez le fournisseur. Une "
+                "mesure locale ne répond jamais à une question distante : c'est "
+                "ainsi qu'un contrôle a décodé un cache vieux de quatre jours et "
+                "rendu un chiffre net, cohérent, et hors sujet. Puis la commande, "
+                "puis ce qu'elle doit répondre si le constat tient encore.\n\n"
+                "Si une ligne est une tâche et non un constat, retire `?constat`."
+                % (len(manquants), ", ".join(t["titre"][:40] for t in manquants[:3])))
+
+    tombes, restant = [], CONSTAT_BUDGET
+    for t in [x for x in attente if x["_i"] < len(specs) and specs[x["_i"]]
+              and not specs[x["_i"]].get("sans")][:CONSTAT_MAX]:
+        t0 = time.time()
+        verdict, raison = rejouer(specs[t["_i"]], restant)
+        restant -= time.time() - t0
+        jour = datetime.date.today().strftime("%d/%m")
+        if verdict == TIENT:
+            t["corps"] = (t.get("corps") or "") + " · reconfirmé le %s" % jour
+        elif verdict == MUET:
+            # JAMAIS lu comme une confirmation : le constat part quand même, en
+            # disant que la vérification n'a pas abouti.
+            t["corps"] = (t.get("corps") or "") + " · le %s, %s" % (jour, raison)
+        else:
+            t["_tombe"] = True
+            tombes.append(t["titre"])
+
+    # LE CONSTAT TOMBÉ QUITTE LES RAPPELS — ET RESTE DANS LE TODO DE L'AGENT.
+    # Le commanditaire ne veut pas de lignes à contrôler ; sa liste doit donc
+    # raccourcir toute seule. Mais AUCUN verdict de machine ne détruit quoi que
+    # ce soit : une vérification qui se trompe effacerait un vrai blocage en
+    # silence, et un contrôle dont l'échec ressemble au succès est précisément
+    # la panne que tout ce dispositif traque. L'agent tranche, au tour suivant.
+    attente = [t for t in attente if not t.get("_tombe")]
+
+    # --- 2 ter. LA FORME : une question, jamais un constat -------------------
+    # Le hook connaît la forme mieux qu'un texte de socle : il lit ces lignes à
+    # chaque fin de tour, il sait donc les refuser AU MOMENT où elles sont
+    # écrites, à UN agent, au lieu de faire relire quinze lignes de consignes à
+    # douze agents à chaque démarrage. Une règle écrite est un conseil ; une
+    # règle ici est appliquée.
+    #
+    # IL NE JUGE QUE LA FORME, jamais la qualité : il voit qu'il manque un point
+    # d'interrogation et des réponses, il ne saura jamais distinguer une bonne
+    # question d'une mauvaise. C'est pour ça que les deux lignes du socle
+    # restent nécessaires.
+    empreintes = {hashlib.sha1(t["titre"].encode("utf-8", "replace")).hexdigest()[:12]
+                  for t in attente}
+    vus_f = ETAT / ("%s.forme" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
+    if not vus_f.exists():
+        # PREMIÈRE RENCONTRE : on enregistre l'arriéré SANS bloquer. Reprendre
+        # 73 lignes anciennes n'est pas le travail du tour en cours, et un
+        # garde-fou qui bloque tout le monde le premier jour est un garde-fou
+        # qu'on finit par désarmer — la leçon du faux positif du 05/09.
+        vus_f.write_text("\n".join(sorted(empreintes)))
+    else:
+        deja = set(vus_f.read_text().split())
+        mauvais = [t for t in attente
+                   if hashlib.sha1(t["titre"].encode("utf-8", "replace")).hexdigest()[:12]
+                   not in deja
+                   and not ("?" in t["titre"]
+                            and len(REPONSE.findall(t.get("corps") or "")) >= 2)]
+        # ON N'AVERTIT QU'UNE FOIS PAR LIGNE, comme les rappels tranchés plus
+        # haut : la ligne rejoint les vues même si elle est mal formée. Un hook
+        # qui redemande à chaque tour finit par coincer l'agent, et aucun
+        # dispositif ne doit pouvoir faire ça.
+        vus_f.write_text("\n".join(sorted(deja | empreintes)))
+        if mauvais:
+            sortie(2,
+                "attente : %d ligne(s) qui attend(ent) le commanditaire sont écrites "
+                "comme des CONSTATS, pas comme des questions : %s.\n\n"
+                "Un constat lui laisse tout le travail — comprendre ce qu'on lui "
+                "demande, deviner comment répondre, mesurer seul ce qu'il risque "
+                "à ne pas répondre. Il doit trancher d'un mot, depuis son "
+                "téléphone, sans rien ouvrir.\n\n"
+                "Réécris chacune dans cette forme :\n\n"
+                "- [ ] !haut @user **J'autorise le paiement en ligne ? oui / non**\n"
+                "      oui → la boutique encaisse dès lundi ; il me faut ta "
+                "signature, 20 min.\n"
+                "      non → on ouvre sans encaissement, les clients paient à la "
+                "livraison.\n"
+                "      Ça attend depuis 4 jours ; j'ai continué sur le reste.\n\n"
+                "Le libellé porte la question ET les réponses possibles. Dessous, "
+                "une ligne par réponse : ce qu'elle DÉCLENCHE, pas ce qu'elle "
+                "signifie. Trois voies : numérote-les, il répond « 2 ».\n\n"
+                "Et si tu ne sais pas quoi faire de l'une des réponses, la question "
+                "n'est pas prête — elle n'a rien à faire dans sa liste.\n\n"
+                "Je ne te le redemanderai pas pour ces lignes-là : c'est un "
+                "avertissement, pas un blocage permanent."
+                % (len(mauvais),
+                   ", ".join("« %s »" % t["titre"][:50] for t in mauvais[:3])
+                   + (", …" if len(mauvais) > 3 else "")))
 
     # --- 3. les Rappels : une vraie case à cocher par décision ---------------
     # LA NOTE ICLOUD A ÉTÉ RETIRÉE LE 06/09/2026, et c'est le commanditaire qui l'a vu :
@@ -616,6 +850,33 @@ def main():
                 _osa(RAPPELS_ECRIRE, agent, SEP_LOT.join(refaits))
 
     dernier.write_text(empreinte)
+
+    # --- 5. DIRE À L'AGENT CE QUI EST TOMBÉ ----------------------------------
+    # Sans ça, un constat quitterait les Rappels sans que personne le sache, et
+    # on aurait fabriqué la panne même qu'on traque : un effet sans trace. Le
+    # constat est toujours dans le todo — c'est l'agent qui tranche, pas le
+    # hook, parce qu'une vérification peut se tromper. Bornée par la même garde :
+    # au plus un blocage par état du todo, jamais d'agent coincé.
+    if tombes:
+        sig = hashlib.sha1(("tombe|%s|%s" % (empreinte, "|".join(tombes)))
+                           .encode()).hexdigest()[:16]
+        temoin = ETAT / ("%s.tombe" % session)
+        if not (temoin.exists() and temoin.read_text().strip() == sig):
+            temoin.write_text(sig)
+            sortie(2,
+                "attente : %d constat(s) ne tiennent plus — leur propre "
+                "vérification dit le contraire :\n\n%s\n\n"
+                "Ils viennent de quitter les Rappels du commanditaire, pour qu'il "
+                "n'ait pas à contrôler des lignes fausses. Ils sont TOUJOURS dans "
+                "`.mind/todo.md` : rien n'a été détruit, parce qu'une vérification "
+                "peut se tromper et qu'un contrôle dont l'échec ressemble au "
+                "succès est exactement ce qu'on cherche à éviter.\n\n"
+                "À toi de trancher : si le constat est bien caduc, coche-le ou "
+                "retire la ligne. S'il tient encore, c'est ta VÉRIFICATION qui est "
+                "fausse — corrige-la plutôt que le constat, et demande-toi d'abord "
+                "de quelle source elle a lu sa réponse."
+                % (len(tombes), "\n".join("  ✗ " + t for t in tombes)))
+
     sortie()
 
 
