@@ -420,10 +420,57 @@ on run argv
     set faits to (name of (every reminder of list nomListe whose completed is true)) as text
     set ouverts to (name of (every reminder of list nomListe whose completed is false)) as text
     set AppleScript's text item delimiters to anciensDelims
-    return faits & "\x1e" & ouverts
+    -- LE CORPS, pour y lire ce que le commanditaire a ÉCRIT. Une case cochée
+    -- dit « j'ai tranché » ; elle ne dit pas LAQUELLE des trois voies, ni
+    -- pourquoi. Les notes sont le seul champ libre qu'un rappel expose —
+    -- mesuré le 07/09/2026 : ni sous-tâche, ni position, ni rang.
+    -- DEUX REQUÊTES ET UNE BOUCLE LOCALE, jamais une boucle QUI INTERROGE.
+    -- Première écriture le 08/09/2026 : `repeat with r in (every reminder …
+    -- whose …)` réévalue le filtre à chaque tour et a dépassé les 40 s du hook.
+    -- Le même piège que le 06/09, qui avait fait passer ce fichier de 5,8 s à
+    -- 1,1 s. Ici on rapatrie les deux listes d'un coup, puis on assemble hors
+    -- de toute requête Apple Events.
+    set nomsL to name of (every reminder of list nomListe whose completed is false)
+    set corpsL to body of (every reminder of list nomListe whose completed is false)
+    set corps to ""
+    repeat with i from 1 to (count of nomsL)
+      set b to item i of corpsL
+      if b is missing value then set b to ""
+      set corps to corps & (item i of nomsL) & "\x1f" & b & "\x1e"
+    end repeat
+    return faits & "\x1e" & ouverts & "\x1d" & corps
   end tell
 end run
 '''
+
+
+# ── RÉPONDRE DEPUIS LE TÉLÉPHONE ─────────────────────────────────────────
+# Une case cochée dit « j'ai tranché ». Elle ne dit pas LAQUELLE des trois
+# voies, ni sous quelle réserve. Demandé par le commanditaire le 08/09/2026 en
+# regardant ses rappels : « j'aimerais pouvoir répondre au point en attente ».
+#
+# LE CORPS EST LE SEUL CHAMP LIBRE. Mesuré le 07/09 : un rappel n'expose que
+# son titre, ses notes, sa priorité, son marquage et ses dates — ni sous-tâche
+# (qui aurait donné la réponse en UN geste), ni position, ni rang. On écrit
+# donc l'invite à la fin des notes, et on relit ce qui la suit.
+MARQUE = "▸ Ta réponse :"
+INVITE = "\n\n" + MARQUE + " "
+
+
+def reponses(corps_par_titre):
+    """{titre: ce que le commanditaire a écrit après l'invite}, non vide seul.
+
+    Tout ce qui suit la marque est à lui, et rien d'autre ne l'est : c'est ce
+    qui permet de distinguer sa réponse du texte que l'agent a lui-même écrit,
+    sans garder d'état ni comparer à une version antérieure."""
+    out = {}
+    for titre, corps in (corps_par_titre or {}).items():
+        if MARQUE not in (corps or ""):
+            continue
+        rep = corps.split(MARQUE, 1)[1].strip()
+        if rep:
+            out[titre] = rep
+    return out
 
 
 def rappels_actuels(liste):
@@ -453,12 +500,30 @@ def rappels_etat(liste, cache_s=60):
     try:
         if cache.exists() and (datetime.datetime.now().timestamp()
                                - cache.stat().st_mtime) < cache_s:
-            return json.loads(cache.read_text())
+            v = json.loads(cache.read_text())
+            return (v[0], v[1], v[2] if len(v) > 2 else {})
     except (OSError, ValueError):
         pass
     brut = _osa(RAPPELS_ETAT, liste)
     if brut is None:
-        return [], []
+        return [], [], {}
+    brut, _, bloc_corps = brut.partition("\x1d")
+    corps = {}
+    for c in bloc_corps.split(SEP_LOT):
+        if SEP_CHAMP in c:
+            nom, _, b = c.partition(SEP_CHAMP)
+            nom = nom.strip()
+            # DES TITRES SE RÉPÈTENT. Mesuré le 08/09/2026 sur la liste du CTO :
+            # 151 rappels ouverts pour 61 titres distincts. Ranger par titre
+            # écrasait donc les doublons — et si la réponse était dans l'un des
+            # écrasés, elle disparaissait sans bruit. On garde celui qui porte
+            # une réponse ; à défaut le plus complet.
+            if nom in corps and MARQUE not in b:
+                continue
+            if nom in corps and MARQUE in corps[nom] and MARQUE in b:
+                if len(corps[nom].split(MARQUE, 1)[1].strip()) >= len(b.split(MARQUE, 1)[1].strip()):
+                    continue
+            corps[nom] = b
     faits, _, ouverts = brut.partition(SEP_LOT)
     val = ([l.strip() for l in faits.splitlines() if l.strip()],
            # SANS PASTILLE = ÉCRIT PAR L'UTILISATEUR. L'agent préfixe toujours ses
@@ -466,7 +531,8 @@ def rappels_etat(liste, cache_s=60):
            # lui. C'est ce qui remplace le canal descendant que portaient les
            # notes, et en mieux : c'est la même surface, dans les deux sens.
            [l.strip() for l in ouverts.splitlines()
-            if l.strip() and l.strip()[0] not in "🔴🟠🟡"])
+            if l.strip() and l.strip()[0] not in "🔴🟠🟡"],
+           corps)
     try:
         cache.write_text(json.dumps(val))
     except OSError:
@@ -774,7 +840,7 @@ def main():
     # tour — même quand le todo n'a pas bougé — et on renvoie l'agent au
     # travail pour qu'il la traite. Bornée par la même garde anti-boucle : au
     # plus un rappel par état, jamais d'agent coincé.
-    coches, demandes = rappels_etat(agent)
+    coches, demandes, corps_rappels = rappels_etat(agent)
     if coches:
         vus = ETAT / ("%s.tranche" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
         deja = set(vus.read_text().splitlines()) if vus.exists() else set()
@@ -920,6 +986,35 @@ def main():
                         "` # fact-ok` dans le message — l'autorisation restera "
                         "dans l'historique."
                         % ", ".join(faits_touches[:4]))
+
+
+    # --- 1 ter bis. CE QU'IL A ÉCRIT DANS LE RAPPEL ------------------------
+    # Cocher dit « j'ai tranché » ; écrire dit QUOI. Sans ce bloc, une question
+    # à trois voies revenait à l'agent sans sa réponse — il savait qu'une
+    # décision était prise et devait la deviner.
+    rep = reponses(corps_rappels)
+    if rep:
+        vus = ETAT / ("%s.reponses" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
+        deja = set(vus.read_text().splitlines()) if vus.exists() else set()
+        neuves = {}
+        empreintes = set()
+        for titre, texte in rep.items():
+            h = hashlib.sha1(("%s|%s" % (titre, texte)).encode()).hexdigest()[:16]
+            empreintes.add(h)
+            if h not in deja:
+                neuves[titre] = texte
+        if neuves:
+            vus.write_text("\n".join(sorted(empreintes | deja)))
+            sortie(2,
+                "attente : le commanditaire a RÉPONDU sur %d point(s), depuis "
+                "ses Rappels.\n\n%s\n\nApplique sa réponse. Si elle tranche la "
+                "question, coche la tâche dans `.mind/todo.md` et retire "
+                "l'entrée de sa liste en la sortant du todo. Si elle ouvre autre "
+                "chose, porte-la dans le todo — mais ne la laisse pas sans "
+                "trace : de son côté, il a répondu."
+                % (len(neuves),
+                   "\n\n".join("  · %s\n    → « %s »" % (k[:70], v[:400])
+                                for k, v in neuves.items())))
 
 
     # --- 2. composer ce qui attend le commanditaire ------------------------------------
@@ -1094,7 +1189,7 @@ def main():
         voulus.add(lib)
         if lib not in existants:
             aCreer.append(SEP_CHAMP.join(
-                (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " "),
+                (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " ") + INVITE,
                  str(PRIO_APPLE.get(t["prio"], 5)))))
     if aCreer:
         _osa(RAPPELS_ECRIRE, agent, SEP_LOT.join(aCreer))
@@ -1153,7 +1248,7 @@ def main():
                 if not t:
                     continue
                 refaits.append(SEP_CHAMP.join(
-                    (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " "),
+                    (lib, (t.get("corps") or "").replace(SEP_CHAMP, " ").replace(SEP_LOT, " ") + INVITE,
                      str(PRIO_APPLE.get(t["prio"], 5)))))
             if refaits:
                 _osa(RAPPELS_ECRIRE, agent, SEP_LOT.join(refaits))
