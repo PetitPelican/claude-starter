@@ -514,13 +514,19 @@ def rappels_etat(liste, cache_s=60):
         return [], [], {}
     faits, _, ouverts = brut.partition(SEP_LOT)
     lignes_ouvertes = [l.strip() for l in ouverts.splitlines() if l.strip()]
+    # LES RÉPONSES SE LISENT AUSSI SUR LES RAPPELS COCHÉS. Mesuré le 08/09/2026,
+    # au premier essai réel du commanditaire : il a répondu à six questions ET
+    # coché les six. C'est le geste naturel — répondre, c'est avoir tranché. Ne
+    # regarder que les rappels ouverts rendait donc ses six réponses invisibles,
+    # au moment précis où il les donnait.
+    lignes_faites = [l.strip() for l in faits.splitlines() if l.strip()]
     val = ([base_reponse(l)[0] for l in faits.splitlines() if l.strip()],
            # SANS PASTILLE = ÉCRIT PAR L'UTILISATEUR. L'agent préfixe toujours ses
            # rappels d'un 🔴🟠🟡 ; un rappel qui n'en porte pas vient donc de
            # lui. C'est ce qui remplace le canal descendant que portaient les
            # notes, et en mieux : c'est la même surface, dans les deux sens.
            [l for l in lignes_ouvertes if l[0] not in "🔴🟠🟡"],
-           reponses(lignes_ouvertes))
+           reponses(lignes_faites + lignes_ouvertes))
     try:
         cache.write_text(json.dumps(val))
     except OSError:
@@ -821,14 +827,47 @@ def main():
                        + (", …" if len(code) > 4 else "")))
 
     agent = nom_agent(racine)
+    # UN SEUL aller-retour vers les Rappels par tour : les trois blocs qui
+    # suivent lisent la même photo. Elle doit être prise ICI, avant le premier
+    # qui s'en sert — l'ordre des blocs a déjà changé une fois.
+    coches, demandes, rep = rappels_etat(agent)
 
-    # --- 1 bis. CE QUE L'UTILISATEUR A TRANCHÉ REVIENT À L'AGENT --------------------
+    # --- 1 bis. CE QU'IL A ÉCRIT DANS LE RAPPEL ------------------------
+    # Cocher dit « j'ai tranché » ; écrire dit QUOI. Sans ce bloc, une question
+    # à trois voies revenait à l'agent sans sa réponse — il savait qu'une
+    # décision était prise et devait la deviner.
+    if rep:
+        vus = ETAT / ("%s.reponses" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
+        deja = set(vus.read_text().splitlines()) if vus.exists() else set()
+        neuves = {}
+        empreintes = set()
+        for titre, texte in rep.items():
+            h = hashlib.sha1(("%s|%s" % (titre, texte)).encode()).hexdigest()[:16]
+            empreintes.add(h)
+            if h not in deja:
+                neuves[titre] = texte
+        if neuves:
+            vus.write_text("\n".join(sorted(empreintes | deja)))
+            sortie(2,
+                "attente : le commanditaire a RÉPONDU sur %d point(s), depuis "
+                "ses Rappels.\n\n%s\n\nApplique sa réponse. Si elle tranche la "
+                "question, coche la tâche dans `.mind/todo.md` et retire "
+                "l'entrée de sa liste en la sortant du todo. Si elle ouvre autre "
+                "chose, porte-la dans le todo — mais ne la laisse pas sans "
+                "trace : de son côté, il a répondu."
+                % (len(neuves),
+                   "\n\n".join("  · %s\n    → « %s »" % (k[:70], v[:400])
+                                for k, v in neuves.items())))
+
+    # --- 1 ter. CE QUE L'UTILISATEUR A TRANCHÉ REVIENT À L'AGENT --------------------
     # C'est la moitié qui manquait à tout le dispositif : un rappel coché est
     # une décision prise, et personne ne la redescendait. On la lit à chaque
     # tour — même quand le todo n'a pas bougé — et on renvoie l'agent au
     # travail pour qu'il la traite. Bornée par la même garde anti-boucle : au
     # plus un rappel par état, jamais d'agent coincé.
-    coches, demandes, rep = rappels_etat(agent)
+    # Un rappel coché QUI PORTE UNE RÉPONSE est traité par le bloc des réponses,
+    # pas ici : les deux disent « j'ai tranché », mais l'un dit aussi QUOI.
+    coches = [c for c in coches if c not in rep]
     if coches:
         vus = ETAT / ("%s.tranche" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
         deja = set(vus.read_text().splitlines()) if vus.exists() else set()
@@ -976,32 +1015,6 @@ def main():
                         % ", ".join(faits_touches[:4]))
 
 
-    # --- 1 ter bis. CE QU'IL A ÉCRIT DANS LE RAPPEL ------------------------
-    # Cocher dit « j'ai tranché » ; écrire dit QUOI. Sans ce bloc, une question
-    # à trois voies revenait à l'agent sans sa réponse — il savait qu'une
-    # décision était prise et devait la deviner.
-    if rep:
-        vus = ETAT / ("%s.reponses" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
-        deja = set(vus.read_text().splitlines()) if vus.exists() else set()
-        neuves = {}
-        empreintes = set()
-        for titre, texte in rep.items():
-            h = hashlib.sha1(("%s|%s" % (titre, texte)).encode()).hexdigest()[:16]
-            empreintes.add(h)
-            if h not in deja:
-                neuves[titre] = texte
-        if neuves:
-            vus.write_text("\n".join(sorted(empreintes | deja)))
-            sortie(2,
-                "attente : le commanditaire a RÉPONDU sur %d point(s), depuis "
-                "ses Rappels.\n\n%s\n\nApplique sa réponse. Si elle tranche la "
-                "question, coche la tâche dans `.mind/todo.md` et retire "
-                "l'entrée de sa liste en la sortant du todo. Si elle ouvre autre "
-                "chose, porte-la dans le todo — mais ne la laisse pas sans "
-                "trace : de son côté, il a répondu."
-                % (len(neuves),
-                   "\n\n".join("  · %s\n    → « %s »" % (k[:70], v[:400])
-                                for k, v in neuves.items())))
 
 
     # --- 2. composer ce qui attend le commanditaire ------------------------------------
