@@ -172,7 +172,7 @@ def blocs_bruts(texte):
 # Une ligne de réponse : « oui → … », « 2 → … ». Le libellé court à gauche de
 # la flèche est la réponse que le commanditaire donnera ; ce qui suit est ce
 # qu'elle DÉCLENCHE. Deux au moins, sinon ce n'est pas une question fermée.
-REPONSE = re.compile(r"^\s*\S[^→\n]{0,24}?\s*→\s*\S")
+REPONSE = re.compile(r"^\s*\S[^→\n]{0,24}?\s*→\s*\S", re.M)
 
 CONSTAT = re.compile(r"(?:^|(?<=\s))\?constat\b", re.I)
 # `↻ machine|service :: commande :: motif attendu`
