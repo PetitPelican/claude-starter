@@ -59,7 +59,7 @@ nomme les agents disponibles.
 `.fact/` laisse passer sans rien injecter. Un briefing n'a jamais à empêcher un
 tour de parole.
 """
-import datetime, errno, json, os, pathlib, re, sys, time
+import datetime, errno, json, os, pathlib, re, subprocess, sys, time
 
 FENETRE_VERROU = 5          # s — au-delà, un verrou est considéré abandonné
 # Deux étages depuis le 04/09/2026. `.fact/` : ce qu'un seul écrivain tient
@@ -69,11 +69,6 @@ FENETRE_VERROU = 5          # s — au-delà, un verrou est considéré abandonn
 # `agents/<nom>/` de voir jamais l'architecture de son projet.
 MIND = ("state.md", "todo.md")
 FACT = ("base.md", "architecture.md", "stack.md", "rules.md")
-# `roles.md` est le SEUL fichier optionnel de `.fact/`, et il n'a de sens qu'en
-# multi-agents : qui tient quoi, et où sont les zones partagées. En mono il n'y
-# a personne d'autre, donc rien à déclarer. On ne le réclame donc jamais — il
-# s'affiche s'il existe, et son absence n'est pas un défaut.
-FACT_OPTIONNEL = ("roles.md",)
 # Avant migration, les cinq fichiers vivent dans `.mind/`. Le briefing lit les
 # deux formes : un projet non migré ne doit rien perdre.
 MIND_ANCIEN = ("state.md", "todo.md", "stack.md", "architecture.md", "rules.md")
@@ -85,6 +80,12 @@ PRIO = re.compile(r"!(haut|moyen|bas)\b")
 # `@dehors` seul réservé. Le `@` doit ouvrir un mot, sinon `root@serveur`
 # passerait pour un destinataire.
 QUI = re.compile(r"(?:^|(?<=\s))@([A-Za-zÀ-ÿ][\w-]*)\b")
+# QUATRIÈME LECTEUR DU DIALECTE, et il fuyait. `?constat` marque une ligne qui
+# peut cesser d'être vraie toute seule ; c'est de la mécanique, pas du texte, et
+# il n'a rien à faire dans la ligne d'entrée d'un agent. Signalé par Splide PO le
+# 07/09/2026, le soir même où la règle a été posée : mon essai portait sur le
+# hook qui écrit les Rappels, celui-ci lit le même fichier par un autre chemin.
+CONSTAT = re.compile(r"(?:^|(?<=\s))\?constat\b", re.I)
 DEHORS = "dehors"
 TITRE = re.compile(r"^##\s+(.+?)\s*$", re.M)
 
@@ -170,7 +171,8 @@ def attentes(texte):
             continue
         p = PRIO.search(libelle)
         out.append((p.group(1) if p else "moyen",
-                    PRIO.sub("", QUI.sub("", libelle)).replace("**", "").strip(" -—·")))
+                    CONSTAT.sub("", PRIO.sub("", QUI.sub("", libelle)))
+                    .replace("**", "").strip(" -—·")))
     out.sort(key=lambda t: {"haut": 0, "moyen": 1, "bas": 2}.get(t[0], 1))
     return out
 
@@ -213,8 +215,7 @@ def a_change(r, projet, depuis):
     surveilles = [r / ".mind" / n for n in MIND_ANCIEN] + \
                  [r / ".claude" / "settings.json", r / "CLAUDE.md"]
     if projet is not None:
-        surveilles += [projet / ".fact" / n for n in FACT + FACT_OPTIONNEL] \
-                      + [projet / "CLAUDE.md"]
+        surveilles += [projet / ".fact" / n for n in FACT] + [projet / "CLAUDE.md"]
     for p in surveilles:
         try:
             if p.stat().st_mtime > depuis:
@@ -253,7 +254,103 @@ def rends_le_tour(r):
         pass
 
 
-def compose(r, projet):
+# ── L'ESPACE COMMUN DU PROJET ────────────────────────────────────────────
+# Ce qu'un agent ne peut PAS savoir tout seul : ce que ses coéquipiers ont fait.
+# Mesuré le 08/09/2026 sur Splide — les trois agents travaillent sur trois copies
+# physiques du dépôt, chacune portant un GEL des fichiers des deux autres, et
+# rien ne le leur dit. `Splide QA` avait deux jours et 187 enregistrements de
+# retard, et lisait une liste de tâches de 1 202 lignes là où la vraie en faisait
+# 2 810.
+#
+# Le carnet est le seul endroit qui n'existe QU'UNE FOIS. Ce hook en est le
+# lecteur, et c'est ce qui rend possible le mécanisme de confiance de SenseLab :
+# **il sait exactement ce qu'il a servi**, donc l'agent n'a jamais à désigner ce
+# qu'il a lu.
+
+def _carnet():
+    """Importé, jamais recopié — même règle que le dialecte de `todo.md`."""
+    try:
+        import importlib.machinery, importlib.util
+        c = pathlib.Path(__file__).resolve().parent / "carnet.py"
+        if not c.exists():
+            return None
+        loader = importlib.machinery.SourceFileLoader("carnet", str(c))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        mod = importlib.util.module_from_spec(spec)
+        loader.exec_module(mod)
+        return mod
+    except Exception:
+        return None
+
+
+def equipe(r, projet, session):
+    """Les lignes du carnet à servir, ou []. Fail-open comme le reste."""
+    if projet is None or r is None or r == projet:
+        return []                       # mono-agent : pas d'espace commun
+    k = _carnet()
+    if k is None:
+        return []
+    esp = k.espace(r)
+    if esp is None:
+        return []
+    lignes, servis = k.resume(esp, r.name)
+    if servis:
+        k.sert(esp, r.name, session or "sans-session", servis)
+        if any("POUR TOI" in x for x in lignes):
+            lignes = lignes + [
+                "         Ce qui te vise reste en tête tant que tu ne l'as pas",
+                "         acquitté : `↩ <empreinte>` dans ta prochaine entrée."]
+        return lignes
+    # CARNET VIDE : il faut quand même le dire, une fois. Sinon un agent
+    # n'apprend l'existence de l'espace commun QU'EN SE FAISANT BLOQUER par le
+    # hook de fin de tour — on lui reprocherait une convention qu'on ne lui a
+    # jamais servie. Deux lignes, et elles disparaissent dès qu'il y a mieux à
+    # montrer.
+    if (esp / "LISEZMOI.md").exists():
+        return ["  (rien de neuf) — tes coéquipiers travaillent sur d'AUTRES "
+                "copies du dépôt.",
+                "  Pour leur dire ce que tu changes chez eux : une ligne "
+                "`↗ <agent> : <quoi>`",
+                "  sous une tâche que tu coches. Le détail : `equipe/LISEZMOI.md`."]
+    return []
+
+
+def retard(r):
+    """« Ta copie a N enregistrements de retard. »
+
+    Un worktree ne voit du travail des autres que ce que sa dernière fusion lui
+    a apporté, et git ne le signale JAMAIS de lui-même : `git status` d'une
+    branche locale ne parle que d'elle. C'est exactement ce qui a rendu QA
+    aveugle pendant deux jours sans qu'il puisse s'en douter."""
+    k = _carnet()
+    if k is None:
+        return None
+    principal = k.racine_commune(r)
+    if principal is None:
+        return None
+    try:
+        ici = pathlib.Path(subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], capture_output=True,
+            text=True, timeout=10, cwd=str(r)).stdout.strip())
+        if ici.resolve() == principal.resolve():
+            return None                 # je SUIS la copie principale
+        ref = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                             capture_output=True, text=True, timeout=10,
+                             cwd=str(principal)).stdout.strip()
+        if not ref or ref == "HEAD":
+            return None
+        n = subprocess.run(["git", "rev-list", "--count", "HEAD..%s" % ref],
+                           capture_output=True, text=True, timeout=10,
+                           cwd=str(ici))
+        if n.returncode != 0:
+            return None
+        c = int(n.stdout.strip() or 0)
+        return (c, ref) if c else None
+    except Exception:
+        return None
+
+
+def compose(r, projet, session=None):
     """Le briefing. `r` est le dossier de l'agent, `projet` celui qui porte le
     `.fact/` — le même en mono, None avant migration."""
     l = []
@@ -285,6 +382,26 @@ def compose(r, projet):
     else:
         a("attente: aucune tâche `@<qui>` ouverte dans .mind/todo.md")
 
+    # L'ÉQUIPE. Placé ici et pas ailleurs : le bloc au-dessus est ce qui te
+    # revient, celui-ci est ce qui revient du reste du projet. Les deux passent
+    # avant les sommaires de fichiers, qui ne disent qu'où chercher.
+    try:
+        lignes = equipe(r, projet, session)
+    except Exception:
+        lignes = []
+    if lignes:
+        a("équipe : ce que les autres ont fait — carnet commun `equipe/`")
+        for x in lignes:
+            a(x)
+    try:
+        rt = retard(r)
+    except Exception:
+        rt = None
+    if rt:
+        a("copie  : ta copie du projet a %d enregistrement(s) de retard sur "
+          "`%s`." % rt)
+        a("         Tu lis donc un GEL des fichiers de tes coéquipiers.")
+
     a("")
     a("Avant toute affirmation sur ce projet, ouvrir le fichier qui porte la")
     a("réponse — ces titres disent lequel :")
@@ -296,11 +413,6 @@ def compose(r, projet):
     fichiers += [("stack.md", "outils, comptes, accès, versions"),
                  ("rules.md", "ce qu'on ne franchit pas"),
                  ("architecture.md", "comment c'est agencé, les frontières")]
-    # `roles.md` seulement s'il existe : le réclamer partout ferait afficher
-    # « ABSENT » à tous les projets mono, où il n'a aucun sens.
-    if faits:
-        fichiers += [(n, "qui tient quoi, et les zones partagées")
-                     for n in FACT_OPTIONNEL if (ou / n).is_file()]
     for nom, quoi in fichiers:
         s = sommaire(ou / nom)
         if not s:
@@ -398,7 +510,8 @@ def main():
     if not prends_le_tour(ancre):       # l'autre interpréteur s'en charge
         rien()
     try:
-        texte = compose(r, projet) if r is not None else avertit_racine(projet)
+        texte = (compose(r, projet, charge.get("session_id"))
+                 if r is not None else avertit_racine(projet))
         etat.parent.mkdir(parents=True, exist_ok=True)
         etat.write_text(json.dumps({"derniere": time.time(),
                                     "evenement": evenement}), encoding="utf-8")

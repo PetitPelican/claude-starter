@@ -474,6 +474,158 @@ def rappels_etat(liste, cache_s=60):
     return val
 
 
+# ── LE CARNET D'ÉQUIPE ───────────────────────────────────────────────────
+# Mesuré le 08/09/2026 sur Splide : trois agents, trois copies physiques du
+# dépôt, et tout ce qu'un agent écrit sur son travail ne voyage que dans SA
+# copie. `Splide QA` — dont le métier est justement de savoir où en sont les
+# deux autres — avait 187 enregistrements de retard et ne voyait AUCUN de leurs
+# journaux. Le mur n'est pas entre les agents, il est entre leurs copies.
+#
+# CE HOOK EST L'ÉCRIVAIN DU CARNET, et il n'écrit que ce que l'agent a
+# DÉLIBÉRÉMENT marqué : une case cochée qui porte `↗ <qui> : <quoi>`. Une case
+# sans `↗` ne produit rien — décider qu'un travail ne concerne personne reste
+# le jugement de l'agent, jamais celui de la machine.
+#
+# POURQUOI LA CASE COCHÉE ET PAS LE COMMIT. Mesuré le même jour : 20 à 50
+# commits par jour et par agent, contre ~10 cases cochées. Le commit est la
+# mauvaise maille — un carnet à cette fréquence serait illisible, donc non lu.
+#
+# `↗` est INVISIBLE aux quatre lecteurs du dialecte, par la même construction
+# que `?constat` et `!haut` avant lui : ils capturent la case et le libellé en
+# bloc. Ajouter ce marqueur ne change aucun des quatre.
+AUDIENCE = re.compile(r"^\s*↗\s*(.+?)\s*:\s*(.+?)\s*$", re.M)
+ISSUE = re.compile(r"(?:^|\s)(abouti|échoué|echoue|échec|en cours)\b", re.I)
+VU = re.compile(r"^\s*↩\s*([0-9a-f]{6,12})\s*$", re.M)
+NIVEAU_DIT = re.compile(r"(?:^|\s)(mesuré|mesure|observé|observe|supposé|suppose)\b",
+                        re.I)
+
+
+def _carnet_mod():
+    """Importé, jamais recopié — même règle que pour le dialecte."""
+    for cand in (pathlib.Path(__file__).resolve().parent / "carnet.py",):
+        m = _import(cand, "carnet")
+        if m and hasattr(m, "espace"):
+            return m
+    return None
+
+
+def _issue_et_niveau(bloc, k):
+    """Cocher une case VAUT « abouti » — c'est ce que cocher veut dire, et ça
+    ramène le coût d'écriture à une phrase. Déclarer un échec, lui, demande de
+    l'écrire : un échec passé pour une réussite est le seul cas qui coûte cher.
+    """
+    m = ISSUE.search(bloc)
+    issue = "abouti"
+    if m:
+        v = m.group(1).lower()
+        issue = ("échoué" if v.startswith(("échou", "echou", "éche", "eche"))
+                 else "en cours" if v.startswith("en ") else "abouti")
+    n = NIVEAU_DIT.search(bloc)
+    if n:
+        v = n.group(1).lower()
+        niveau = ("mesuré" if v.startswith("mesur") else
+                  "observé" if v.startswith("observ") else "supposé")
+    else:
+        niveau = "mesuré" if REOUVRE.search(bloc) else "observé"
+    return issue, niveau
+
+
+def zones_partagees(esp):
+    """Les chemins dont le hook sait, SANS demander à l'agent, qu'ils concernent
+    les autres. Déclarés dans le projet (`equipe/ZONES`), jamais en dur ici :
+    ce fichier est partagé par quinze agents, et une liste écrite pour Splide
+    bloquerait les quatorze autres sur des chemins qui ne les regardent pas.
+
+    Absent = aucun blocage. C'est le bon défaut : un projet qui n'a pas déclaré
+    ses zones partagées n'en a pas."""
+    try:
+        return [l.strip() for l in (esp / "ZONES").read_text().splitlines()
+                if l.strip() and not l.startswith("#")]
+    except Exception:
+        return []
+
+
+def carnet_tour(racine, lot, agent, session, todo, esp, k):
+    """Rend `(ecrites, issue_derniere)` — ce que ce tour a versé au carnet."""
+    import fnmatch
+    texte = todo.read_text(encoding="utf-8", errors="replace")
+    cochees = []
+    for b in blocs_lignes(texte):
+        if not re.match(r"^\s*[-*]\s*\[(x|X)\]", b):
+            continue
+        if not AUDIENCE.search(b):
+            continue                      # sans `↗`, ça ne concerne personne
+        cochees.append(b)
+
+    vus = ETAT / ("%s.carnet" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
+    deja = set(vus.read_text().splitlines()) if vus.exists() else set()
+    # PREMIÈRE RENCONTRE : on enregistre sans écrire. Splide OPS porte 144 cases
+    # déjà cochées — les déverser d'un coup noierait le carnet à sa naissance et
+    # ferait bouger la confiance de rien. Le passif est amnistié, la règle ne
+    # vaut que pour la suite. Même dispositif que pour la forme des questions.
+    premiere = not vus.exists()
+    neuves = []
+    empreintes = set()
+    for b in cochees:
+        h = hashlib.sha1(b.strip().encode("utf-8")).hexdigest()[:16]
+        empreintes.add(h)
+        if h not in deja:
+            neuves.append((h, b))
+    if premiere:
+        vus.write_text("\n".join(sorted(empreintes)))
+        return [], None
+
+    ecrites, derniere = [], None
+    for h, b in neuves:
+        titre = re.sub(r"^\s*[-*]\s*\[(x|X)\]\s+", "", b.splitlines()[0]).strip()
+        titre = re.sub(r"!(haut|moyen|bas)\b", "", titre, flags=re.I)
+        titre = re.sub(r"(?:^|(?<=\s))@[A-Za-zÀ-ÿ][\w-]*\b", "", titre)
+        titre = CONSTAT.sub("", titre).strip()
+        issue, niveau = _issue_et_niveau(b, k)
+        pour = AUDIENCE.findall(b)
+        mr = REOUVRE.search(b)
+        rejeu = ("%s :: %s :: %s" % mr.groups()) if mr else None
+        ident = k.ecrire(esp, agent, titre, issue=issue, niveau=niveau,
+                         pour=pour, rejeu=rejeu, vus=VU.findall(b))
+        if ident:
+            ecrites.append(ident)
+            derniere = issue
+    if neuves:
+        vus.write_text("\n".join(sorted(empreintes | deja)))
+    return ecrites, derniere
+
+
+def zone_touchee(racine, agent, zones):
+    """Les fichiers commités DEPUIS LE TOUR PRÉCÉDENT qui tombent dans une zone
+    partagée. Le repère est `HEAD` mémorisé au dernier passage : `git status` ne
+    voit que le non-commité, et ce qui vient d'être commité lui est invisible —
+    c'est justement ce qu'on cherche."""
+    import fnmatch
+    r = _git(["rev-parse", "HEAD"], cwd=str(racine))
+    if not r or r.returncode != 0:
+        return []
+    tete = r.stdout.strip()
+    # LE REPÈRE EST PAR AGENT, PAS PAR SESSION. Mesuré sur le banc le
+    # 08/09/2026 : rangé par session, il naissait vide à chaque nouvelle
+    # session, et le PREMIER commit de chaque session échappait donc à la règle
+    # — silencieusement, puisque le hook est fail-open. C'est le cas le plus
+    # fréquent en pratique : on ouvre une session, on répare, on commite.
+    temoin = ETAT / ("%s.tete" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
+    ancien = temoin.read_text().strip() if temoin.exists() else ""
+    temoin.write_text(tete)
+    if not ancien or ancien == tete:
+        return []
+    d = _git(["diff", "--name-only", "%s..%s" % (ancien, tete)], cwd=str(racine))
+    if not d or d.returncode != 0:
+        return []
+    touches = []
+    for f in d.stdout.splitlines():
+        f = f.strip()
+        if f and any(fnmatch.fnmatch(f, z) for z in zones):
+            touches.append(f)
+    return touches
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -612,6 +764,71 @@ def main():
                 "COCHE le rappel pour lui dire que tu l'as prise. Ne le laisse pas "
                 "sans réponse : de son côté, il ne sait pas si tu l'as vue."
                 % (len(neuves), "\n".join("  → " + d for d in neuves)))
+
+    # --- 1 quater. LE CARNET D'ÉQUIPE ---------------------------------------
+    k = _carnet_mod()
+    esp = k.espace(racine) if k else None
+    if esp is not None:
+        try:
+            ecrites, issue = carnet_tour(racine, lot, agent, session, todo,
+                                         esp, k)
+        except Exception:
+            ecrites, issue = [], None
+        # LE MÉCANISME DE SENSELAB, à l'identique : ce que l'agent avait LU voit
+        # sa confiance bouger quand il déclare son issue — sans qu'il désigne
+        # quoi que ce soit, parce que c'est le briefing qui a servi les entrées
+        # et qui sait donc ce qu'il a servi. Un échec grave coûte cinq
+        # réussites : la confiance doit être facile à perdre et lente à
+        # reconstruire.
+        if issue:
+            try:
+                k.bouge(esp, k.lu(esp, agent, session),
+                        k.ECHEC if issue == "échoué" else k.REUSSITE)
+            except Exception:
+                pass
+        # LE BLOCAGE. On ne demande pas à l'agent de juger si son travail
+        # concerne les autres — on le lit du chemin qu'il a touché. Les zones
+        # sont déclarées par le projet, jamais devinées.
+        zones = zones_partagees(esp)
+        if zones and not ecrites:
+            try:
+                touches = zone_touchee(racine, agent, zones)
+            except Exception:
+                touches = []
+            if touches:
+                sig = hashlib.sha1(("carnet|" + "|".join(sorted(touches)))
+                                   .encode()).hexdigest()[:16]
+                temoin = ETAT / ("%s.equipe" % session)
+                if not (temoin.exists() and temoin.read_text().strip() == sig):
+                    temoin.write_text(sig)
+                    sortie(2,
+                        "attente : tu viens de commiter dans une zone que "
+                        "d'autres agents lisent ou importent (%s), sans rien "
+                        "verser au carnet d'équipe.\n\n"
+                        "Tes coéquipiers travaillent sur d'autres copies du "
+                        "dépôt : ils ne verront ton travail qu'à leur prochaine "
+                        "fusion, parfois deux jours plus tard, et RIEN ne le "
+                        "leur dira. Le carnet est le seul endroit qui n'existe "
+                        "qu'une fois.\n\n"
+                        "Ajoute `↗` sous la tâche que tu viens de finir dans "
+                        "`.mind/todo.md`, et coche-la :\n\n"
+                        "- [x] Réparer l'inscription des coachs\n"
+                        "      ↗ PO : l'écran d'inscription n'a plus besoin de "
+                        "son contournement.\n"
+                        "      ↻ service :: curl -s -o /dev/null -w "
+                        "'%%{http_code}' https://…/signup :: ^200$\n\n"
+                        "UNE LIGNE `↗` PAR AGENT CONCERNÉ, et ce qu'elle dit "
+                        "est ce que ça change POUR LUI — pas le résumé de ton "
+                        "travail. Sans `↗`, rien n'est versé : c'est à toi de "
+                        "juger qui est concerné.\n\n"
+                        "La ligne `↻` est facultative et vaut « mesuré » : "
+                        "l'entrée porte alors de quoi être revérifiée, et sa "
+                        "confiance se restaure quand elle tient. Sans elle, "
+                        "l'entrée vaut « observé ».\n\n"
+                        "Si ton travail a ÉCHOUÉ, écris-le : `échoué` dans le "
+                        "bloc. Un échec sert d'examen, jamais d'exemple — le "
+                        "taire est la façon la plus sûre de le refaire."
+                        % ", ".join(touches[:4]))
 
     # --- 2. composer ce qui attend le commanditaire ------------------------------------
     # 0,4 s par appel AppleScript, mesuré : trop pour être payé à chaque tour,
