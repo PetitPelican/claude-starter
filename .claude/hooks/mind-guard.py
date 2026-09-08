@@ -78,6 +78,38 @@ def deny(reason):
     sys.exit(0)
 
 
+def _memoire():
+    """Le module qui dit OÙ vit la mémoire. Importé, jamais recopié."""
+    try:
+        import importlib.machinery, importlib.util
+        c = pathlib.Path(__file__).resolve().parent / "memoire.py"
+        if not c.exists():
+            return None
+        l = importlib.machinery.SourceFileLoader("memoire", str(c))
+        s = importlib.util.spec_from_loader(l.name, l)
+        m = importlib.util.module_from_spec(s)
+        l.exec_module(m)
+        return m
+    except Exception:
+        return None
+
+
+def deportee():
+    """`(dossier .mind, dossier .fact)` si la mémoire est hors du dépôt.
+
+    CE QUE ÇA CHANGE POUR CE GARDE, et il faut l'avoir en tête : déportés, ces
+    fichiers n'apparaissent JAMAIS dans `git diff --cached` du dépôt de code.
+    Les chercher là rendrait le garde inerte — et silencieusement, puisqu'il
+    laisse passer par défaut. On lit donc le disque au lieu de l'index."""
+    mm = _memoire()
+    if mm is None:
+        return None, None
+    try:
+        return mm.pour_agent()
+    except Exception:
+        return None, None
+
+
 def contexte():
     """Où l'agent travaille, et sous quelle forme — tout le reste en découle.
 
@@ -142,6 +174,18 @@ def stage(chemin):
     répare `state.md`, oublie de l'ajouter, et commite la version cassée."""
     r = _git(["show", ":" + chemin])
     return r.stdout if r.returncode == 0 else None
+
+
+def lis_disque(p):
+    """Le fichier tel qu'il est SUR LE DISQUE — pas tel qu'il sera commité.
+
+    `stage()` juste au-dessus fait l'inverse, et c'est voulu : quand la mémoire
+    est dans le dépôt, ce qui compte est ce qui sera enregistré. Déportée, elle
+    n'est pas dans cet index-là ; le disque est alors la seule vérité."""
+    try:
+        return pathlib.Path(p).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
 
 
 def entete(texte):
@@ -221,6 +265,9 @@ def main():
     # de cause, ce qui est la bonne façon de le signaler.
     lot, projet, faits = contexte()
     state, todo = lot + ".mind/state.md", lot + ".mind/todo.md"
+    d_mind, d_fact = deportee()
+    if d_fact is not None:
+        faits = faits or "«déporté»"     # le projet A des faits, ailleurs
     champs = CHAMPS_REQUIS_FACT if faits else CHAMPS_REQUIS
 
     r = _git(["diff", "--cached", "--name-only"])
@@ -253,8 +300,9 @@ def main():
 
     # 1. LISIBILITÉ — vaut même sans code, un fichier cassé est le pire cas.
     for nom, verif in ((state, lambda x: verifie_state(x, champs)),):
-        if nom in fichiers:
-            texte = stage(nom)
+        if nom in fichiers or d_mind is not None:
+            texte = (lis_disque(d_mind / "state.md") if d_mind is not None
+                     else stage(nom))
             if texte is None:
                 continue  # suppression ou renommage : ce n'est pas notre sujet
             maux = verif(texte)
@@ -275,14 +323,54 @@ def main():
     # il a quitté `state.md` le 04/09/2026, parce qu'un projet n'a qu'une
     # destination même à plusieurs agents.
     if faits:
-        texte = _git(["show", "HEAD:" + faits + "base.md"])
-        contenu = stage(faits + "base.md") or (texte.stdout if texte.returncode == 0 else "")
+        if d_fact is not None:
+            contenu = lis_disque(d_fact / "base.md")
+        else:
+            texte = _git(["show", "HEAD:" + faits + "base.md"])
+            contenu = stage(faits + "base.md") or (texte.stdout if texte.returncode == 0 else "")
         if not entete(contenu).get("cap"):
             deny("mind-guard : `%sbase.md` ne porte pas de `cap:` — le tableau "
                  "de bord n'a alors AUCUNE réponse au niveau du projet, quel "
                  "que soit le nombre d'agents qui s'y déclarent. Écris-y "
                  "l'en-tête `---` avec `cap:`, puis recommite (` # fact-ok`, "
                  "c'est `.fact/`)." % faits)
+
+    # DÉPORTÉ, `state.md` n'est JAMAIS dans l'index du dépôt de code : exiger
+    # qu'il y soit bloquerait tous les commits, pour toujours. La règle devient
+    # « il doit être plus récent que le code », lue sur le disque — même
+    # intention, autre preuve.
+    if d_mind is not None:
+        # LES CHEMINS DE `git diff --cached` SONT RELATIFS À LA RACINE DU
+        # DÉPÔT, jamais au dossier courant — qui est ici celui de l'agent. Les
+        # stat-er tels quels ne trouverait rien, `recent` vaudrait 0, et le
+        # garde laisserait tout passer sans le dire. Même piège que celui qui a
+        # rendu ce fichier inerte le 04/09/2026.
+        rr = _git(["rev-parse", "--show-toplevel"])
+        if rr.returncode != 0:
+            allow()
+        rr = pathlib.Path(rr.stdout.strip())
+        try:
+            s = (d_mind / "state.md").stat().st_mtime
+        except OSError:
+            allow()
+        recent = 0
+        for f in code:
+            q = rr / f
+            try:
+                recent = max(recent, q.stat().st_mtime)
+            except OSError:
+                pass
+        if not recent or s >= recent:
+            allow()
+        echantillon = ", ".join(code[:5]) + (", …" if len(code) > 5 else "")
+        deny("mind-guard : du code projet est indexé (%s) alors que ta "
+             "déclaration d'état n'a pas bougé depuis. C'est ce que le tableau "
+             "de bord lit pour savoir où en est ce projet. Mets `.mind/state.md` "
+             "à jour (dont le champ `maj:`), puis recommite. Si elle n'a vraiment "
+             "pas à bouger, ajoute ` # mind-ok` à la fin de la commande.\n\n"
+             "Ta mémoire est DÉPORTÉE dans `memoire/` : il n'y a rien à `git "
+             "add`, elle est versionnée à part et commitée toute seule en fin "
+             "de tour." % echantillon)
 
     if state not in fichiers:
         echantillon = ", ".join(code[:5]) + (", …" if len(code) > 5 else "")

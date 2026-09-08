@@ -663,7 +663,14 @@ def main():
     except Exception:
         sortie()
 
-    todo = racine / lot / ".mind" / "todo.md"
+    # LA MÉMOIRE PEUT ÊTRE DÉPORTÉE (08/09/2026) : hors du dépôt de code, pour
+    # n'exister qu'une fois quand plusieurs agents travaillent sur plusieurs
+    # copies du même dépôt. Chercher sous `racine/lot/` ne trouverait alors
+    # rien — et ce hook étant fail-open, il se tairait.
+    mm = _import(pathlib.Path(__file__).resolve().parent / "memoire.py", "memoire")
+    d_mind, d_fact = (mm.pour_agent() if mm else (None, None))
+    todo = (d_mind / "todo.md") if d_mind is not None \
+        else (racine / lot / ".mind" / "todo.md")
     if not todo.exists():
         sortie()                                    # projet hors harnais
 
@@ -829,6 +836,55 @@ def main():
                         "bloc. Un échec sert d'examen, jamais d'exemple — le "
                         "taire est la façon la plus sûre de le refaire."
                         % ", ".join(touches[:4]))
+
+    # --- 1 quinquies. LA MÉMOIRE DÉPORTÉE S'ENREGISTRE TOUTE SEULE ----------
+    # Déportée, la mémoire d'état n'est plus dans le dépôt de code : les agents
+    # ne la commitent donc plus en commitant leur travail. Sans ce bloc elle
+    # n'aurait AUCUN historique — on aurait échangé la duplication contre
+    # l'amnésie, ce qui est pire. Elle a son propre dépôt, et il se remplit ici.
+    #
+    # `.fact/` EN EST EXCLU, ET C'EST LE POINT DÉLICAT. C'est la mémoire
+    # partagée du projet : elle ne s'écrit qu'à la demande du commanditaire, et
+    # `mind-guard` le faisait respecter au commit du dépôt de code. Déportée,
+    # elle ne passe plus par là — le garde serait devenu inerte, en silence.
+    # Il vient donc ici : l'enregistrement automatique la laisse de côté, et
+    # l'agent est renvoyé au travail une fois s'il y a touché.
+    if d_mind is not None and mm is not None:
+        b = mm.base()
+        if b is not None and (b / ".git").is_dir():
+            st = _git(["status", "--porcelain"], cwd=str(b))
+            lignes = st.stdout.splitlines() if st and st.returncode == 0 else []
+            faits_touches = [l[3:].strip().strip('"') for l in lignes
+                             if l[3:].strip().strip('"').startswith(".fact/")]
+            autres = [l for l in lignes
+                      if not l[3:].strip().strip('"').startswith(".fact/")]
+            if autres:
+                _git(["add", "-A", "--", ".", ":(exclude).fact"], cwd=str(b))
+                _git(["commit", "-q", "-m",
+                      "Mémoire — %s, %s" % (agent,
+                       datetime.datetime.now().strftime("%d/%m %H:%M"))],
+                     cwd=str(b))
+            if faits_touches:
+                sig = hashlib.sha1(("fact|" + "|".join(sorted(faits_touches)))
+                                   .encode()).hexdigest()[:16]
+                temoin = ETAT / ("%s.faits" % session)
+                if not (temoin.exists() and temoin.read_text().strip() == sig):
+                    temoin.write_text(sig)
+                    sortie(2,
+                        "attente : tu as modifié les FAITS du projet (%s). Ce "
+                        "sont les seuls fichiers partagés par tous les agents, "
+                        "et ils ne s'écrivent qu'à la demande du "
+                        "commanditaire — un agent qui les réécrit depuis son "
+                        "lot efface le travail d'un autre en silence.\n\n"
+                        "Ta mémoire est déportée : elle s'enregistre toute "
+                        "seule en fin de tour, MAIS jamais ces fichiers-là. "
+                        "Ils resteront donc en attente indéfiniment.\n\n"
+                        "Si le commanditaire ne l'a pas demandé, annule-les. "
+                        "S'il l'a demandé, enregistre-les toi-même avec "
+                        "` # fact-ok` dans le message — l'autorisation restera "
+                        "dans l'historique."
+                        % ", ".join(faits_touches[:4]))
+
 
     # --- 2. composer ce qui attend le commanditaire ------------------------------------
     # 0,4 s par appel AppleScript, mesuré : trop pour être payé à chaque tour,

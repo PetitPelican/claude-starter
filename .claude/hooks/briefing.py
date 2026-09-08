@@ -116,6 +116,49 @@ def _remonte(depart, marqueur):
         p = p.parent
 
 
+def _mod(nom):
+    """Importe un module voisin de ce hook. Importé, jamais recopié."""
+    try:
+        import importlib.machinery, importlib.util
+        c = pathlib.Path(__file__).resolve().parent / (nom + ".py")
+        if not c.exists():
+            return None
+        l = importlib.machinery.SourceFileLoader(nom, str(c))
+        s = importlib.util.spec_from_loader(l.name, l)
+        m = importlib.util.module_from_spec(s)
+        l.exec_module(m)
+        return m
+    except Exception:
+        return None
+
+
+def _memoire():
+    return _mod("memoire")
+
+
+def mind_de(r):
+    """Le `.mind/` de CET agent — déporté ou en place."""
+    mm = _memoire()
+    if mm is not None:
+        mind, _ = mm.pour_agent(r)
+        if mind is not None:
+            return mind
+    return r / ".mind"
+
+
+def fait_de(r, projet):
+    """Le `.fact/` du projet — déporté ou en place. None si pas encore migré."""
+    mm = _memoire()
+    if mm is not None:
+        _, fact = mm.pour_agent(r)
+        if fact is not None:
+            return fact if fact.is_dir() else None
+    if projet is None:
+        return None
+    f = projet / ".fact"
+    return f if f.is_dir() else None
+
+
 def racines(charge):
     """**Deux remontées indépendantes** — le coeur du dispositif multi-agents.
 
@@ -133,6 +176,21 @@ def racines(charge):
     cap, les décisions en attente et les droits d'un projet étranger."""
     declare = (os.environ.get("CLAUDE_PROJECT_DIR") or charge.get("cwd")
                or os.getcwd())
+    # FORME DÉPORTÉE (08/09/2026) : la mémoire d'état d'un projet multi-copies
+    # vit dans `<racine>/memoire/`, pour n'exister qu'une fois. La remontée
+    # ci-dessous ne la trouverait pas — elle cherche sous le dossier de
+    # l'agent, et il n'y a plus rien.
+    #
+    # ON RENVOIE QUAND MÊME LES DOSSIERS DE L'AGENT ET DU PROJET, pas ceux de
+    # la mémoire : `r` et `projet` servent aussi d'ancre au verrou, à l'état du
+    # briefing et au titre. C'est `compose()` qui lit la mémoire, et lui seul.
+    mm = _memoire()
+    if mm is not None:
+        mind, fact = mm.pour_agent(declare)
+        if mind is not None:
+            racine = mm.racine_depot(declare)
+            agent = pathlib.Path(declare).resolve()
+            return agent, (racine if racine else agent)
     return _remonte(declare, ".mind"), _remonte(declare, ".fact")
 
 
@@ -212,10 +270,14 @@ def a_change(r, projet, depuis):
     `.fact/` en fait partie : une architecture mise à jour par un autre agent
     doit rebriefer celui-ci. L'omettre laisserait un agent travailler une
     session entière sur une frontière qui a bougé."""
-    surveilles = [r / ".mind" / n for n in MIND_ANCIEN] + \
+    md = mind_de(r)
+    surveilles = [md / n for n in MIND_ANCIEN] + \
                  [r / ".claude" / "settings.json", r / "CLAUDE.md"]
     if projet is not None:
-        surveilles += [projet / ".fact" / n for n in FACT] + [projet / "CLAUDE.md"]
+        ft = fait_de(r, projet)
+        if ft is not None:
+            surveilles += [ft / n for n in FACT]
+        surveilles += [projet / "CLAUDE.md"]
     for p in surveilles:
         try:
             if p.stat().st_mtime > depuis:
@@ -355,8 +417,9 @@ def compose(r, projet, session=None):
     `.fact/` — le même en mono, None avant migration."""
     l = []
     a = l.append
-    faits = (projet / ".fact") if projet is not None else None
-    e = entete(lis(r / ".mind" / "state.md"))
+    faits = fait_de(r, projet)
+    md = mind_de(r)
+    e = entete(lis(md / "state.md"))
     # Le `cap` appartient au PROJET, pas à l'agent : à plusieurs, ils visent la
     # même destination. Avant migration il est encore dans `state.md`.
     base = entete(lis(faits / "base.md")) if faits else {}
@@ -374,7 +437,7 @@ def compose(r, projet, session=None):
       % (frais, "" if j is None else " (%d j)" % j,
          e.get("sante") or "—", e.get("jalon") or "—"))
 
-    att = attentes(lis(r / ".mind" / "todo.md"))
+    att = attentes(lis(md / "todo.md"))
     if att:
         a("attente: %d décision(s) humaine(s) — la première : [%s] %s"
           % (len(att), att[0][0], att[0][1][:70]))
@@ -407,7 +470,7 @@ def compose(r, projet, session=None):
     a("réponse — ces titres disent lequel :")
     # Deux formes, deux adresses. Après migration ces fichiers sont dans
     # `.fact/` — partagés par tous les agents du projet ; avant, dans `.mind/`.
-    ou = faits if faits else (r / ".mind")
+    ou = faits if faits else md
     prefixe = ".fact/" if faits else ".mind/"
     fichiers = [("base.md", "la nature du projet, et où il va")] if faits else []
     fichiers += [("stack.md", "outils, comptes, accès, versions"),
@@ -459,8 +522,12 @@ def avertit_racine(projet):
     noms = []
     if dossier.is_dir():
         try:
-            noms = sorted(d.name for d in dossier.iterdir()
-                          if (d / ".mind").is_dir())
+            mm = _memoire()
+            b = mm.base_projet(projet) if mm else None
+            noms = sorted(
+                d.name for d in dossier.iterdir()
+                if (d / ".mind").is_dir()
+                or (b is not None and (b / "agents" / d.name / ".mind").is_dir()))
         except OSError:
             noms = []
     l = ["── Briefing · %s ─ TU N'ES DANS AUCUN AGENT ──" % projet.name,

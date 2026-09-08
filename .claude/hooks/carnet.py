@@ -96,10 +96,14 @@ def racine_commune(depart=None):
 
 
 def espace(depart=None, creer=False):
+    """`<racine>/memoire/equipe` si la mémoire est déportée, sinon
+    `<racine>/equipe`. Les deux sont hors du suivi de version et n'existent
+    qu'une fois — le carnet a été le premier à passer, le reste de la mémoire
+    d'état l'a suivi le 08/09/2026 et l'a rejoint dans le même dossier."""
     r = racine_commune(depart)
     if r is None:
         return None
-    e = r / "equipe"
+    e = (r / "memoire" / "equipe") if (r / "memoire").is_dir() else (r / "equipe")
     if creer:
         try:
             (e / ".etat").mkdir(parents=True, exist_ok=True)
