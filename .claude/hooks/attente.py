@@ -545,6 +545,45 @@ def zones_partagees(esp):
         return []
 
 
+def libelle_carnet(bloc):
+    """Le libellé d'une tâche cochée, lisible par un AUTRE agent.
+
+    Trois défauts vus dès la première demi-heure d'usage réel, le 08/09/2026 :
+
+      · un agent BARRE le libellé quand il coche (`~~ … ~~`), et la barre
+        partait telle quelle dans le carnet ;
+      · un libellé en gras court souvent sur DEUX lignes, et n'en prendre que
+        la première coupait la phrase en plein milieu — « les quatre tiennent,
+        et trois tournaient pour la » ;
+      · les marqueurs du dialecte (`!haut`, `@user`, `?constat`) n'ont rien à
+        faire dans un carnet lu par un pair.
+
+    Un carnet illisible ne se lit pas : c'est le seul défaut qui annule tout le
+    dispositif, puisque personne ne vient signaler qu'il ne lit plus.
+    """
+    lignes = bloc.splitlines()
+    tete = re.sub(r"^\s*[-*]\s*\[(x|X)\]\s+", "", lignes[0]).strip()
+    morceaux = [tete]
+    # Le libellé barré se ferme sur une ligne suivante quand il est long : on
+    # continue jusqu'à sa fermeture, jamais au-delà.
+    if tete.startswith("~~") and tete.count("~~") < 2:
+        for l in lignes[1:]:
+            s = l.strip()
+            if s.startswith(("↗", "↻", "↩")):
+                break
+            morceaux.append(s)
+            if "~~" in s:
+                break
+    t = " ".join(morceaux)
+    t = t.replace("~~", "")
+    t = re.sub(r"!(haut|moyen|bas)\b", "", t, flags=re.I)
+    t = re.sub(r"(?:^|(?<=\s))@[A-Za-zÀ-ÿ][\w-]*\b", "", t)
+    t = CONSTAT.sub("", t)
+    t = re.sub(r"\*\*(.+?)\*\*", r"\1", t)
+    t = re.sub(r"\s+", " ", t).strip(" —-–:·")
+    return t[:200].rstrip() + ("…" if len(t) > 200 else "")
+
+
 def carnet_tour(racine, lot, agent, session, todo, esp, k):
     """Rend `(ecrites, issue_derniere)` — ce que ce tour a versé au carnet."""
     import fnmatch
@@ -577,10 +616,7 @@ def carnet_tour(racine, lot, agent, session, todo, esp, k):
 
     ecrites, derniere = [], None
     for h, b in neuves:
-        titre = re.sub(r"^\s*[-*]\s*\[(x|X)\]\s+", "", b.splitlines()[0]).strip()
-        titre = re.sub(r"!(haut|moyen|bas)\b", "", titre, flags=re.I)
-        titre = re.sub(r"(?:^|(?<=\s))@[A-Za-zÀ-ÿ][\w-]*\b", "", titre)
-        titre = CONSTAT.sub("", titre).strip()
+        titre = libelle_carnet(b)
         issue, niveau = _issue_et_niveau(b, k)
         pour = AUDIENCE.findall(b)
         mr = REOUVRE.search(b)
