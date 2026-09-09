@@ -1,7 +1,13 @@
 # Avant d'affirmer
 
-Sept questions, rejouées au moment où tu t'apprêtes à dire quelque chose qui
+Onze questions, rejouées au moment où tu t'apprêtes à dire quelque chose qui
 coûtera une décision à Maxime. Pas avant chaque tour : avant chaque **constat**.
+
+Les sept premières valent partout. **Les quatre dernières sont ce que cinquante
+notes de mémoire disent une fois qu'on les a compilées** — les mêmes quatre
+pièges, sur ce poste, encore et encore.
+
+## Partout
 
 - **Ton instrument a-t-il répondu à LA question posée, ou à une plus petite ?**
   « ça marche ICI » ne répond pas à « ça marche LÀ-BAS ». Vingt-trois fois.
@@ -25,10 +31,48 @@ coûtera une décision à Maxime. Pas avant chaque tour : avant chaque **constat
 - **Ce fait, l'as-tu périmé toi-même en travaillant ?** L'âge n'est pas le seul
   déclencheur : « je viens de changer ce dont ce fait parle » en est un.
 
+## Sur cette machine
+
+- **Comptes et jetons — lis-tu l'état du compte, ou un cache ?** Un jeton vit
+  dans une session de sécurité : **il n'existe aucun fichier à vérifier**, et
+  429, jeton expiré et compte déconnecté se ressemblent en sortie. Seul un
+  démarrage réel tranche. Et il n'y a **qu'un compte, sur le profil par
+  défaut** — une connexion sans précaution l'écrase, retirer un profil rend
+  invisibles les agents qui y tournent, et rien ne le dit.
+- **Droits — as-tu LU ce droit, ou l'as-tu FRANCHI ?** Une déclaration dans un
+  fichier de réglages ne dit rien de ce qui s'exécute : l'arbre en service peut
+  porter une autre version. Un refus gagne partout et **ne se creuse pas**. Une
+  API peut répondre 204 sans rien changer. Le seul contrôle est de faire le
+  geste et de relire après.
+- **Chemins — de quel arbre parle ta mesure, et lequel la session lit-elle ?**
+  Plusieurs copies du même dépôt portent les mêmes noms de fichiers, et deux
+  chiffres faux le même jour en sont sortis. Et **un nom est une adresse avant
+  d'être un titre** : cinq points du poste rangent par chemin, un renommage
+  déplace en silence ce qui s'y trouve.
+- **Mécanismes — celui-ci a-t-il un appelant, et son déclencheur se produit-il
+  vraiment ?** Une étiquette que l'agent doit poser lui-même ne se pose jamais
+  — `échoué` existe depuis le début du carnet, zéro entrée sur vingt la porte.
+  Un garde armé sur **l'action** au lieu du **résultat** se tait pour toujours
+  après un seul passage. Et un témoin doit avoir **la même durée de vie que ce
+  qu'il protège** : un compteur de session rangé dans un fichier d'agent se
+  remplit une fois, définitivement.
+
 <!-- ÉCRITURE — ce qui suit n'est pas servi à la lecture, c'est la règle du
      fichier lui-même. Il est court par construction : au-delà d'une dizaine de
      lignes, personne ne le lit, et il cesse d'être une liste de contrôle pour
      devenir un document de plus.
+
+     LE PLAFOND EST DE ONZE — sept partout, quatre sur cette machine. Il n'est
+     pas rond par hasard : c'est ce qui tient sous les yeux d'un coup. Ajouter
+     une douzième ligne, c'est en CORRIGER une autre dans le même geste, ou
+     n'ajouter rien.
+
+     LA SECONDE SECTION EST UNE COMPILATION, pas un journal. Elle vient des
+     notes de mémoire (`~/.claude/projects/<projet>/memory/`), qui restent la
+     chronologie : elles gardent les cas, une par une, avec leurs dates. Ici on
+     ne garde que ce qu'elles disent EN COMMUN — quatre familles pour une
+     cinquantaine de notes. Un cas isolé n'y monte pas ; il y monte quand un
+     TROISIÈME cas le rejoint, et alors on réécrit la ligne, on n'en ajoute pas.
 
      IL SE CORRIGE SUR PLACE, IL NE S'EMPILE PAS. La même leçon apprise deux
      fois est UNE règle : renforce-la ou précise-la, n'en ajoute pas une seconde

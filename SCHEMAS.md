@@ -615,6 +615,19 @@ commanditaire* la personne pour qui les agents travaillent.
 │  ⚠️ CLASSÉE PAR CHEMIN — déplacer le projet
 │     la perd EN SILENCE. La déplacer fait
 │     partie du renommage.
+│  ⚠️ CHAQUE NOTE DIT COMMENT ELLE A ÉTÉ ÉTABLIE,
+│     sur sa première ligne de corps :
+│         > **mesuré** · 09/09/2026 — <par quoi>
+│     mesuré (une commande l'a rendu) · observé
+│     (vu, sans instrument) · supposé (déduit,
+│     jamais vérifié) · dit (le commanditaire
+│     l'a dit — ça se re-DEMANDE, pas se re-mesure)
+│     LE NIVEAU SE DÉCLARE EN ÉCRIVANT. Deviné
+│     après coup, il tombe sur tout : un essai sur
+│     55 notes en a classé 51 « mesuré ». Une note
+│     sans niveau reste sans niveau — un poids
+│     inconnu qui se dit inconnu vaut mieux qu'un
+│     poids inventé.
 │
 └── LE PROJET
     │
@@ -656,6 +669,38 @@ commanditaire* la personne pour qui les agents travaillent.
 ║   vrai pour un AUTRE agent du projet        ──────────►  .fact/         ║
 ║   tenu par CET agent seul                   ──────────►  .mind/         ║
 ║   écrit par un hook, jamais à la main       ──────────►  .logs/         ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║  ET CE QUE CHAQUE MAISON REFUSE                                          ║
+║                                                                          ║
+║  Le test ci-dessus dit où POSER. Il ne dit pas où NE PAS poser — et      ║
+║  c'est là que les doublons naissent : la même chose finit à deux         ║
+║  endroits, dans deux versions, et plus personne ne sait laquelle est     ║
+║  vraie. Chaque dossier déclare donc ce qui appartient au voisin.         ║
+║                                                                          ║
+║   .fact/ REFUSE ..... ce qui est daté (→ docs/) · ce que cet agent seul  ║
+║                       tient (→ .mind/) · toute LEÇON DE MÉTHODE : une    ║
+║                       règle vraie sur un autre projet n'est pas un fait  ║
+║                       de celui-ci (→ mémoire auto).                      ║
+║   .mind/ REFUSE ..... ce qu'un coéquipier doit savoir (→ .fact/) ·       ║
+║                       l'historique de comment on en est arrivé là        ║
+║                       (→ docs/).                                         ║
+║   docs/  REFUSE ..... ce qui est vrai MAINTENANT : un état actuel rangé  ║
+║                       dans les traces se périme sans que personne le     ║
+║                       voie (→ .fact/ ou .mind/).                         ║
+║   .logs/ REFUSE ..... tout ce qu'une main écrit. Une ligne ajoutée à la  ║
+║                       main dans un journal automatique fait mentir la    ║
+║                       seule trace qu'on croyait mécanique.               ║
+║   LA MÉMOIRE AUTO                                                        ║
+║          REFUSE ..... tout ce qui est propre à un projet — un chemin,    ║
+║                       un port, une clé, un nom de branche.               ║
+║                       TEST : cette phrase resterait-elle utile sur un    ║
+║                       projet jamais ouvert ? Non → elle va dans .fact/.  ║
+║                                                                          ║
+║  ET SI RIEN NE VA, c'est le rangement qui a un trou, pas la phrase :     ║
+║  la poser dans docs/ EN LE DISANT, et le signaler. Un classement qu'on   ║
+║  force produit une mémoire à laquelle on cesse de se fier.               ║
 ╚══════════════════════════════════════════════════════════════════════════╝
 
    POURQUOI DES PLAFONDS ....... sans eux, .mind/ dérive et plus personne ne
