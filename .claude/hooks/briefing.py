@@ -362,11 +362,15 @@ def cible(nom):
     try:
         t = (pathlib.Path.home() / ".claude" / "attente"
              / ("%s.cible" % re.sub(r"[^A-Za-z0-9_-]", "-", nom))).read_text()
-        verdict, jour, phrase = t.split("\t", 2)
+        ch = t.split("\t")
+        verdict, jour, phrase = ch[0], ch[1], ch[-1]
+        suite = int(ch[2]) if len(ch) > 3 and ch[2].isdigit() else 1
     except Exception:
         return None
     ecart = {"TIENT": "tenue au %s" % jour,
-             "TOMBÉ": "PAS TENUE au %s — c'est ton sujet" % jour,
+             "TOMBÉ": ("PAS TENUE au %s — c'est ton sujet" % jour) if suite < 3
+                      else ("PAS TENUE, et l'écart n'a pas bougé depuis %d "
+                            "mesures — ce qu'on essaie ne marche pas" % suite),
              "SANS": "AUCUNE MESURE n'est encore écrite — c'est le premier "
                      "travail : sans elle, cette phrase est un vœu"}.get(
                  verdict, "pas mesurée au %s : la vérification n'a pas abouti" % jour)

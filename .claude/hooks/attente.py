@@ -73,6 +73,19 @@ RECHUTES_MAX = 3
 # hasard, trois est une habitude.
 RECIDIVE = 3
 
+# COMBIEN DE MESURES IDENTIQUES AVANT DE DIRE QU'ON S'ACHARNE. La boucle n'avait
+# aucun frein : ni plafond d'itérations, ni budget, ni détection de
+# non-progression. Tant que Maxime disait « vas-y » à chaque cycle, son propre
+# rythme la bornait. Depuis que QA peut commander l'exécution d'un plan, elle
+# peut tourner sans lui — et le frein humain qui bornait tout a sauté sans que
+# rien le remplace.
+#
+# Des trois freins possibles, c'est le seul qui dise quelque chose d'utile. Un
+# plafond d'itérations s'arrête en silence, sans qu'on sache si c'était fini ou
+# coincé. Un budget de jetons s'arrête au mauvais moment. Celui-ci dit : l'écart
+# à la cible n'a pas bougé de trois mesures — ce qu'on essaie ne marche pas.
+CIBLE_ACHARNEMENT = 3
+
 # Rempli par main() dès que les deux sont connus. Un blocage qui partirait avant
 # écrit « ? » plutôt que de faire tomber le hook — il est fail-open, et un
 # journal ne doit jamais être la cause d'une panne.
@@ -1457,10 +1470,53 @@ def main():
             # haut ne sert plus à rien.
             verdict = TOMBE if TOMBE in (verdict, v) else (
                 v if verdict == MUET else verdict)
+        # LA NON-PROGRESSION SE COMPTE SUR LA MESURE, PAS SUR LES TOURS. Ce bloc
+        # ne tourne que quand le travail a bougé : le compteur compte donc des
+        # cycles réels, pas des allers-retours de conversation. Il repart à zéro
+        # dès que le verdict change — ou que la cible elle-même change, sinon
+        # une cible neuve hériterait de l'acharnement de l'ancienne.
+        avant_v, avant_n, avant_p = "", 0, ""
         try:
-            f_cible.write_text("%s\t%s\t%s" % (verdict, jour, phrase))
+            ch = f_cible.read_text().split("\t")
+            avant_v = ch[0]
+            avant_n = int(ch[2]) if len(ch) > 3 and ch[2].isdigit() else 1
+            avant_p = ch[-1]
         except Exception:
             pass
+        suite = avant_n + 1 if (verdict == avant_v and phrase == avant_p) else 1
+        try:
+            f_cible.write_text("%s\t%s\t%d\t%s" % (verdict, jour, suite, phrase))
+        except Exception:
+            pass
+
+        # ON NE BLOQUE QUE SUR TOMBÉ, et jamais sur MUET ni sur SANS : une
+        # vérification qui n'aboutit pas ne prouve pas qu'on s'acharne, elle
+        # prouve qu'on ne sait pas. Et on rappelle tous les CIBLE_ACHARNEMENT
+        # cycles, pas à chaque tour : assez pour qu'on ne l'oublie pas, assez
+        # rare pour ne pas coincer l'agent.
+        if verdict == TOMBE and suite >= CIBLE_ACHARNEMENT and suite % CIBLE_ACHARNEMENT == 0:
+            sortie(2, quoi="B11-acharnement", detail=suite, message=
+                "attente : la cible du projet n'est pas tenue, et l'écart n'a "
+                "PAS BOUGÉ depuis %d mesures.\n\n"
+                "  🎯 %s\n\n"
+                "Ce que tu essaies ne marche pas. Continuer à prescrire la même "
+                "chose ne la fera pas marcher — et personne ne s'en apercevra, "
+                "parce qu'une boucle qui tourne ressemble à une boucle qui "
+                "avance.\n\n"
+                "ARRÊTE de represcrire. Deux gestes, dans cet ordre :\n\n"
+                "1. Demande-toi si c'est la MESURE qui est fausse avant de "
+                "conclure que le produit l'est. Une vérification qui rend "
+                "toujours le même verdict est suspecte : de quelle source "
+                "lit-elle sa réponse ?\n"
+                "2. Si la mesure tient, pose la question au commanditaire dans "
+                "`.mind/todo.md` — une question fermée, ce que chaque réponse "
+                "déclenche, et la ligne `fini quand →`. C'est lui qui tranche "
+                "entre changer d'approche, changer la cible, ou accepter "
+                "l'écart.\n\n"
+                "Si tu ne conduis pas la campagne, tu n'as rien à prescrire : "
+                "note-le et continue ton travail.\n\n"
+                "Je te le redirai dans %d cycles si rien ne bouge."
+                % (suite, phrase[:150], CIBLE_ACHARNEMENT))
 
     # LE CONSTAT TOMBÉ QUITTE LES RAPPELS — ET RESTE DANS LE TODO DE L'AGENT.
     # Le commanditaire ne veut pas de lignes à contrôler ; sa liste doit donc
