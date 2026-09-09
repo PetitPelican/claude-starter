@@ -5,6 +5,11 @@ coûtera une décision à Maxime. Pas avant chaque tour : avant chaque **constat
 
 - **Ton instrument a-t-il répondu à LA question posée, ou à une plus petite ?**
   « ça marche ICI » ne répond pas à « ça marche LÀ-BAS ». Vingt-trois fois.
+  **Et quand tu construis l'instrument toi-même : par combien de chemins la
+  chose arrive-t-elle, et combien en vois-tu ?** Un compteur qui n'observe
+  qu'une des deux portes rend un plancher, jamais un total — et ce qu'il ne voit
+  pas passe pour inexistant. Dis-le DANS le rapport, sinon le chiffre a l'air
+  juste.
 - **Le chiffre que tu lis mesure-t-il ce que tu crois ?** `unused` n'est pas la
   mémoire libre ; un cache n'est pas le service ; un dépôt n'est pas l'arbre
   qu'une commande a lu.
