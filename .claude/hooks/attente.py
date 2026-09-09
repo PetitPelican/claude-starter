@@ -53,6 +53,26 @@ ETAT = pathlib.Path.home() / ".claude" / "attente"
 # ce qui a mordu et sur quoi, jamais ce qui a été dit.
 JOURNAL = ETAT / "blocages.log"
 
+# LA LISTE DE CONTRÔLE DES RECHUTES. Nos erreurs qui reviennent étaient toutes
+# écrites — dans 54 mémoires, dans deux fichiers de consignes, dans des rapports
+# — et AUCUNE ne se rejouait au moment où elle aurait servi. La même est revenue
+# vingt-trois fois, dont une deux heures après que je l'aie écrite dans le
+# rapport qui la décrivait. Écrire la leçon et la rejouer sont deux gestes
+# différents ; nous ne faisions que le premier.
+RECHUTES = pathlib.Path.home() / ".claude" / "rechutes.md"
+SEP_RECHUTES = "<!-- ÉCRITURE"
+
+# Au plus, par session : la garde par signature d'état ne suffit pas seule, car
+# corriger le todo produit un état neuf, donc un nouveau blocage. Trois, puis on
+# se tait — un dispositif qui peut coincer un agent est un dispositif qu'on
+# finit par désarmer.
+RECHUTES_MAX = 3
+
+# À partir de combien de fois une garde qui reprend le même agent cesse d'être
+# un rappel pour devenir une règle à écrire. Trois : deux peuvent être un
+# hasard, trois est une habitude.
+RECIDIVE = 3
+
 # Rempli par main() dès que les deux sont connus. Un blocage qui partirait avant
 # écrit « ? » plutôt que de faire tomber le hook — il est fail-open, et un
 # journal ne doit jamais être la cause d'une panne.
@@ -71,6 +91,19 @@ def _journal(quoi, detail=""):
         pass
 
 
+def rechutes():
+    """La partie SERVIE de la liste — jamais la partie qui dit comment l'écrire.
+
+    Fichier absent, illisible, vide : on rend "" et rien ne bloque. Une liste de
+    contrôle qui empêche de travailler quand elle manque serait le contraire de
+    ce qu'elle est."""
+    try:
+        t = RECHUTES.read_text()
+    except Exception:
+        return ""
+    return t.split(SEP_RECHUTES)[0].strip()
+
+
 def purge_temoins(jours=7):
     """Les témoins de SESSION ne servent qu'à leur session — ils s'accumulaient
     sans fin (37 fichiers au 09/09). Ceux par AGENT sont cumulatifs et durables :
@@ -79,7 +112,8 @@ def purge_temoins(jours=7):
     try:
         limite = time.time() - jours * 86400
         for f in ETAT.glob("*.*"):
-            if f.suffix in (".bloc", ".equipe", ".constat", ".tombe", ".faits") \
+            if f.suffix in (".bloc", ".equipe", ".constat", ".tombe", ".faits",
+                            ".compteur") \
                and f.stat().st_mtime < limite:
                 f.unlink()
     except Exception:
@@ -100,10 +134,48 @@ DESTINATAIRES = tuple(
     if d.strip()
 ) or ("user",)
 
+def _recidive(quoi, jours=7):
+    """Combien de fois CE blocage a déjà repris CET agent cette semaine.
+
+    Lecture du journal posé plus haut. C'est lui qui rend la boucle possible :
+    sans trace, « ça revient » était une impression, jamais un nombre."""
+    try:
+        limite = (datetime.datetime.now()
+                  - datetime.timedelta(days=jours)).strftime("%Y-%m-%d %H:%M:%S")
+        n = 0
+        for l in JOURNAL.read_text(errors="replace").splitlines()[-4000:]:
+            c = l.split("\t")
+            if len(c) >= 3 and c[0] >= limite and c[1] == _CTX["agent"] and c[2] == quoi:
+                n += 1
+        return n
+    except Exception:
+        return 0
+
+
 def sortie(code=0, message=None, quoi=None, detail=""):
-    """L'unique canal de sortie — et donc le seul point où tracer un blocage."""
+    """L'unique canal de sortie — et donc le seul point où tracer un blocage,
+    et le seul où l'on peut voir qu'il revient."""
     if code == 2 and quoi:
+        vues = _recidive(quoi)          # AVANT d'écrire la ligne de ce tour-ci
         _journal(quoi, detail)
+        # LA PROMOTION QUI MANQUAIT : une panne qui revient devient une ligne de
+        # la liste de contrôle. On ne la demande PAS au premier passage — une
+        # garde qui mord une fois a fait son travail. À la RÉCIDIVE, c'est autre
+        # chose : le rappel ne suffit pas, il faut une règle qui se rejoue.
+        #
+        # Accrochée au blocage plutôt qu'à une sortie de plus : elle n'apparaît
+        # qu'au moment où le défaut est vivant, elle ne peut pas boucler seule,
+        # et elle ne coûte rien les jours où tout va bien.
+        if message and vues + 1 >= RECIDIVE:
+            message += (
+                "\n\n— — —\nCette garde t'a repris %d fois cette semaine. "
+                "Un rappel qui revient n'est plus un rappel, c'est une règle "
+                "manquante.\n\nAvant de repartir, ouvre `~/.claude/rechutes.md` "
+                "et écris UNE ligne : qu'aurait-il fallu vérifier avant ? "
+                "Si une ligne dit déjà à peu près ça, CORRIGE-LA au lieu d'en "
+                "ajouter une — la même leçon apprise deux fois est une seule "
+                "règle. N'y mets jamais une panne d'environnement, ni une "
+                "affirmation négative sur un outil.\n" % (vues + 1))
     if message:
         sys.stderr.write(message)
     sys.exit(code)
@@ -1018,6 +1090,12 @@ def main():
     # --- 1 quater. LE CARNET D'ÉQUIPE ---------------------------------------
     k = _carnet_mod()
     esp = k.espace(racine) if k else None
+    # INITIALISÉES AVANT LA BRANCHE, et c'est le point. Un seul projet de
+    # l'atelier a un espace d'équipe : pour les neuf autres, `esp` vaut None et
+    # tout ce qui lirait `ecrites` plus bas tomberait en NameError. Le hook est
+    # fail-open, donc il tomberait EN SILENCE — et la liste de contrôle posée
+    # plus bas ne se serait jamais déclenchée nulle part, sans que rien le dise.
+    ecrites, issue = [], None
     if esp is not None:
         try:
             ecrites, issue = carnet_tour(racine, lot, agent, session, todo,
@@ -1368,6 +1446,67 @@ def main():
                    ", ".join("« %s »" % t["titre"][:50] for t in mauvais[:3])
                    + (", …" if len(mauvais) > 3 else "")))
 
+    # --- 2 quater. LA LISTE DE CONTRÔLE, JOUÉE AVANT D'AFFIRMER -------------
+    # ICI ET PAS AILLEURS. C'est le dernier point où le tour est encore
+    # rattrapable : les constats viennent d'être rejoués, la forme vient d'être
+    # jugée, et rien n'est encore parti vers le téléphone de Maxime. Un tour en
+    # arrière, la liste arrivait trop tôt — elle n'aurait rien eu à contrôler ;
+    # un tour en avant, elle arrive trop tard — la question est déjà chez lui.
+    #
+    # ELLE NE MORD QUE SUR CE QUI COÛTE UNE DÉCISION : une question neuve pour
+    # Maxime, un constat neuf, une entrée de carnet versée ce tour. Le travail
+    # ordinaire — du code, des essais, une lecture — n'est JAMAIS interrompu.
+    # C'est la condition pour qu'elle survive : une liste qui se rappelle à tous
+    # les tours est une liste qu'on désarme.
+    #
+    # « Neuf » se mesure sur un témoin par AGENT, cumulatif, avec l'amnistie de
+    # première rencontre des deux autres — sinon les quatorze questions déjà
+    # ouvertes déclencheraient toutes au premier passage, et reprendre l'arriéré
+    # n'est pas le travail du tour en cours.
+    liste = rechutes()
+    if liste and attente:
+        # DEUX TÉMOINS, DEUX DURÉES DE VIE, et les confondre était mon erreur.
+        # Ce qui a DÉJÀ été contrôlé appartient à l'agent et doit survivre aux
+        # sessions ; le PLAFOND appartient à la session, sinon il se remplit une
+        # fois pour toutes et la liste ne se rejoue plus jamais — le garde
+        # anti-boucle serait redevenu le garde de la panne.
+        f_rech = ETAT / ("%s.rechutes" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
+        # Suffixe différent du témoin d'agent, exprès : la purge des témoins
+        # de session le ramasse, et elle ne doit SURTOUT pas ramasser l'autre
+        # — ce serait rendre son amnistie de première rencontre chaque semaine.
+        f_cpt = ETAT / ("%s.compteur" % session)
+        h_neufs = {hashlib.sha1(t["titre"].encode("utf-8", "replace")).hexdigest()[:12]
+                   for t in attente}
+        if not f_rech.exists():
+            f_rech.write_text("\n".join(sorted(h_neufs)))
+        else:
+            deja = set(f_rech.read_text().split())
+            try:
+                faits = int(f_cpt.read_text().strip())
+            except Exception:
+                faits = 0
+            neufs = [t for t in attente
+                     if hashlib.sha1(t["titre"].encode("utf-8", "replace"))
+                        .hexdigest()[:12] not in deja]
+            # Une entrée de carnet versée ce tour compte aussi : elle porte un
+            # niveau de confiance, donc elle affirme.
+            declenche = bool(neufs) or bool(ecrites)
+            f_rech.write_text("\n".join(sorted(deja | h_neufs)))
+            if declenche and faits < RECHUTES_MAX:
+                f_cpt.write_text(str(faits + 1))
+                sortie(2, quoi="B10-rechutes", detail=len(neufs), message=
+                    "attente : %d point(s) vont partir chez le commanditaire. "
+                    "Avant qu'ils partent, rejoue ceci — c'est la liste de nos "
+                    "erreurs qui reviennent, et elle t'a déjà repris :\n\n"
+                    "%s\n\n"
+                    "Reprends chacune de tes affirmations en face de ces sept "
+                    "lignes. Si l'une d'elles mord, corrige la mesure AVANT de "
+                    "corriger la conclusion — c'est presque toujours l'instrument "
+                    "qui a tort, pas le monde.\n\n"
+                    "Si rien ne mord, dis-le en une ligne et continue : je ne te "
+                    "le redemanderai pas pour ces points-là."
+                    % (len(neufs) or len(ecrites), liste))
+
     # --- 3. les Rappels : une vraie case à cocher par décision ---------------
     # LA NOTE ICLOUD A ÉTÉ RETIRÉE LE 06/09/2026, et c'est le commanditaire qui l'a vu :
     # dès lors que le rappel porte le titre, l'explication (son corps), la
@@ -1502,7 +1641,13 @@ def main():
                 "À toi de trancher : si le constat est bien caduc, coche-le ou "
                 "retire la ligne. S'il tient encore, c'est ta VÉRIFICATION qui est "
                 "fausse — corrige-la plutôt que le constat, et demande-toi d'abord "
-                "de quelle source elle a lu sa réponse."
+                "de quelle source elle a lu sa réponse.\n\n"
+                "ET DANS LES DEUX CAS, TU AS AFFIRMÉ QUELQUE CHOSE DE FAUX : ou "
+                "bien le constat, ou bien le contrôle. C'est le seul endroit de "
+                "la chaîne où on le sait avec certitude. Écris UNE ligne dans "
+                "`~/.claude/rechutes.md` : qu'aurait-il fallu vérifier avant ? "
+                "Corrige une ligne existante si elle dit déjà à peu près ça — la "
+                "même leçon apprise deux fois est une seule règle."
                 % (len(tombes), "\n".join("  ✗ " + t for t in tombes)))
 
     sortie()
