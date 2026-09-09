@@ -1438,7 +1438,14 @@ def main():
     phrase, specs_cible = consigne(d_f)
     if phrase:
         f_cible = ETAT / ("%s.cible" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
-        verdict, jour = MUET, datetime.date.today().strftime("%d/%m")
+        jour = datetime.date.today().strftime("%d/%m")
+        # UNE CIBLE SANS MESURE N'EST PAS UNE CIBLE NON MESURÉE. Les deux
+        # rendraient MUET et se liraient pareil, alors qu'ils appellent des
+        # gestes opposés : l'un dit « ta vérification a échoué, répare-la »,
+        # l'autre « personne n'a encore écrit de vérification ». Le second est
+        # l'état normal d'une cible qu'on vient de poser, et le taire ferait
+        # passer pour une panne ce qui est le premier travail à faire.
+        verdict = MUET if specs_cible else "SANS"
         for sp in specs_cible[:2]:
             if restant <= 0:
                 break

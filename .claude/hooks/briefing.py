@@ -360,7 +360,9 @@ def cible(nom):
     except Exception:
         return None
     ecart = {"TIENT": "tenue au %s" % jour,
-             "TOMBÉ": "PAS TENUE au %s — c'est ton sujet" % jour}.get(
+             "TOMBÉ": "PAS TENUE au %s — c'est ton sujet" % jour,
+             "SANS": "AUCUNE MESURE n'est encore écrite — c'est le premier "
+                     "travail : sans elle, cette phrase est un vœu"}.get(
                  verdict, "pas mesurée au %s : la vérification n'a pas abouti" % jour)
     return "cible  : %s\n         → %s" % (phrase[:150], ecart)
 
