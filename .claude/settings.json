@@ -64,6 +64,16 @@
             "statusMessage": "journal (le script filtre lui-même)"
           }
         ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 5,
+            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/memoire-usage.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/memoire-usage.py\""
+          }
+        ]
       }
     ],
     "Stop": [

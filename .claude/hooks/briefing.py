@@ -351,6 +351,62 @@ def _carnet():
         return None
 
 
+MENAGE_J, MEM_DORMANT_J = 7, 30
+
+
+def memoire_a_ranger(r):
+    """Une ligne au démarrage quand la mémoire mérite un ménage — ou rien.
+
+    LE DÉCLENCHEUR EST L'ACTIVITÉ, PAS UNE HORLOGE. Repris à Hermes, qui ne pose
+    aucun démon : il regarde, quand l'agent bouge, si assez de temps a passé.
+    Zéro service à installer, et jamais un réveil en plein travail.
+
+    IL COMPTE, IL NE RANGE PAS. Archiver retire des choses de la vue de Maxime ;
+    aucun automatisme ne fait ça ici. `claude-memoire --appliquer` est un geste,
+    et il reste le sien — ou le mien, en connaissance de cause.
+
+    Coût : un glob et une lecture de JSON. Aucun fichier de note n'est ouvert."""
+    try:
+        slug = re.sub(r"[^A-Za-z0-9]+", "-", str(r.resolve()))
+        mem = pathlib.Path.home() / ".claude" / "projects" / slug / "memory"
+        if not mem.is_dir():
+            return None
+        f = mem / ".usage.json"
+        u = json.loads(f.read_text()) if f.exists() else {}
+    except Exception:
+        return None
+    if not u.get("_depuis"):
+        return None
+    def j(iso):
+        try:
+            return (datetime.date.today() - datetime.date.fromisoformat(iso)).days
+        except Exception:
+            return 0
+    if j(u.get("_menage") or "1970-01-01") < MENAGE_J:
+        return None
+    notes = [x.stem for x in mem.glob("*.md") if x.stem.upper() != "MEMORY"]
+    if not notes:
+        return None
+    depuis = j(u["_depuis"])
+    froides = [n for n in notes
+               if not (u.get(n) or {}).get("epingle")
+               and j((u.get(n) or {}).get("vu") or u["_depuis"]) >= MEM_DORMANT_J]
+    servies = len([n for n in notes if (u.get(n) or {}).get("vu")])
+    try:
+        u["_menage"] = datetime.date.today().isoformat()
+        tmp = f.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(u, ensure_ascii=False, indent=1, sort_keys=True))
+        os.replace(tmp, f)
+    except Exception:
+        pass
+    if not froides:
+        return None
+    return ("mémoire: %d note(s) sur %d n'ont pas servi depuis %d j — %d ont servi "
+            "au moins une fois.\n         `claude-memoire` pour voir, "
+            "`--appliquer` pour ranger. Rien n'est jamais effacé."
+            % (len(froides), len(notes), MEM_DORMANT_J, servies))
+
+
 def cible(nom):
     """La cible du projet et l'écart au dernier rejeu — ou None.
 
@@ -487,6 +543,13 @@ def compose(r, projet, session=None):
         c = None
     if c:
         for x in c.split("\n"):
+            a(x)
+    try:
+        mr = memoire_a_ranger(r) if r is not None else None
+    except Exception:
+        mr = None
+    if mr:
+        for x in mr.split("\n"):
             a(x)
 
     # L'ÉQUIPE. Placé ici et pas ailleurs : le bloc au-dessus est ce qui te
