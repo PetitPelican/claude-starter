@@ -68,7 +68,13 @@ FENETRE_VERROU = 5          # s — au-delà, un verrou est considéré abandonn
 # dossier trouvé, et deux étages homonymes empêcheraient un agent de
 # `agents/<nom>/` de voir jamais l'architecture de son projet.
 MIND = ("state.md", "todo.md")
-FACT = ("base.md", "architecture.md", "stack.md", "rules.md")
+# `roles.md` EN FAIT PARTIE, et son absence était le trou le plus ironique du
+# harnais : c'est LE fichier qui dit à chaque agent ce que les autres tiennent,
+# et c'était le seul des cinq à ne pas rebriefer quand il changeait. Un agent
+# pouvait donc travailler des jours sur une frontière déplacée la veille — le
+# cas précis que ce fichier existe pour éviter. Trouvé le 09/09/2026 en
+# vérifiant si une règle qu'on venait d'y écrire atteindrait vraiment QA.
+FACT = ("base.md", "architecture.md", "stack.md", "rules.md", "roles.md")
 # Avant migration, les cinq fichiers vivent dans `.mind/`. Le briefing lit les
 # deux formes : un projet non migré ne doit rien perdre.
 MIND_ANCIEN = ("state.md", "todo.md", "stack.md", "architecture.md", "rules.md")
