@@ -345,6 +345,26 @@ def _carnet():
         return None
 
 
+def cible(nom):
+    """La cible du projet et l'écart au dernier rejeu — ou None.
+
+    LECTURE SEULE D'UN TÉMOIN. C'est `attente.py` qui rejoue la vérification en
+    fin de tour, sur son budget ; ce hook-ci tient en 15 s et ne doit lancer
+    aucune commande. Il lit donc un verdict d'il y a un tour, ce qui est
+    exactement ce qu'il faut : une cible se juge sur la journée, pas sur la
+    seconde."""
+    try:
+        t = (pathlib.Path.home() / ".claude" / "attente"
+             / ("%s.cible" % re.sub(r"[^A-Za-z0-9_-]", "-", nom))).read_text()
+        verdict, jour, phrase = t.split("\t", 2)
+    except Exception:
+        return None
+    ecart = {"TIENT": "tenue au %s" % jour,
+             "TOMBÉ": "PAS TENUE au %s — c'est ton sujet" % jour}.get(
+                 verdict, "pas mesurée au %s : la vérification n'a pas abouti" % jour)
+    return "cible  : %s\n         → %s" % (phrase[:150], ecart)
+
+
 def equipe(r, projet, session):
     """Les lignes du carnet à servir, ou []. Fail-open comme le reste."""
     if projet is None or r is None or r == projet:
@@ -444,6 +464,18 @@ def compose(r, projet, session=None):
         a("         Ça passe avant tout le reste dans un point d'avancement.")
     else:
         a("attente: aucune tâche `@<qui>` ouverte dans .mind/todo.md")
+
+    # LA CIBLE, AU-DESSUS DE TOUT LE RESTE DU PROJET. Un agent qui démarre voit
+    # d'abord ce qui attend Maxime, puis vers quoi il va — et seulement ensuite
+    # ce que les autres ont fait. Un projet sans cible ne voit RIEN : pas de
+    # ligne vide, qui se lirait comme un oubli plutôt que comme une absence.
+    try:
+        c = cible(r.name if r is not None else "")
+    except Exception:
+        c = None
+    if c:
+        for x in c.split("\n"):
+            a(x)
 
     # L'ÉQUIPE. Placé ici et pas ailleurs : le bloc au-dessus est ce qui te
     # revient, celui-ci est ce qui revient du reste du projet. Les deux passent

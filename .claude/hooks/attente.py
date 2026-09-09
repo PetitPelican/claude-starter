@@ -104,6 +104,40 @@ def rechutes():
     return t.split(SEP_RECHUTES)[0].strip()
 
 
+CONSIGNE = re.compile(r"^#{2,3}\s*consigne\b.*$", re.I | re.M)
+
+
+def consigne(d_fact):
+    """La cible du projet : une phrase, et de quoi mesurer l'écart.
+
+    ELLE VIT DANS LES FAITS DU PROJET, ET C'EST UNE DÉCISION, PAS UN RANGEMENT.
+    Un agent qui écrit sa propre cible peut toujours l'atteindre — c'est
+    Maxime qui l'écrit, dans le seul dossier que `mind-guard` protège par
+    ` # fact-ok`. Le hook ne fait que la LIRE.
+
+    Rend `(phrase, [specs de rejeu])`, ou `(None, [])`. Pas de consigne n'est
+    pas une anomalie : la plupart des projets n'en ont pas, et le briefing
+    n'affiche alors RIEN — pas une ligne vide qui ferait croire à un oubli."""
+    if d_fact is None:
+        return None, []
+    try:
+        t = (d_fact / "base.md").read_text()
+    except Exception:
+        return None, []
+    m = CONSIGNE.search(t)
+    if not m:
+        return None, []
+    # Bornée au titre suivant : la section porte la phrase, puis ses `↻`.
+    reste = t[m.end():]
+    fin = re.search(r"^#{1,3}\s", reste, re.M)
+    corps = reste[:fin.start()] if fin else reste
+    specs = [{"source": a.lower(), "cmd": b, "motif": c}
+             for a, b, c in REOUVRE.findall(corps)]
+    phrase = " ".join(l.strip() for l in corps.splitlines()
+                      if l.strip() and not l.lstrip().startswith("↻"))
+    return (lisible(phrase)[:200] or None), specs
+
+
 def purge_temoins(jours=7):
     """Les témoins de SESSION ne servent qu'à leur session — ils s'accumulaient
     sans fin (37 fichiers au 09/09). Ceux par AGENT sont cumulatifs et durables :
@@ -291,6 +325,22 @@ def blocs_bruts(texte):
 # la flèche est la réponse que le commanditaire donnera ; ce qui suit est ce
 # qu'elle DÉCLENCHE. Deux au moins, sinon ce n'est pas une question fermée.
 REPONSE = re.compile(r"^\s*\S[^→\n]{0,24}?\s*→\s*\S", re.M)
+
+# LA DÉFINITION DU FINI. Décidée par Maxime le 09/09 : sur TOUTES les questions,
+# pas seulement celles qui ont quelque chose à aller voir. Sa raison, dans ses
+# mots : il ne veut pas me croire sur parole.
+#
+# ELLE RESSEMBLE À UNE RÉPONSE, ET C'EST LE PIÈGE. `REPONSE` reconnaît « x → y »
+# avec au plus 24 caractères à gauche ; « fini quand → … » entre dans le moule.
+# Sans ce motif pour la retrancher, une question à UNE SEULE réponse passerait
+# le contrôle des deux réponses grâce à sa ligne de fin — le garde compterait
+# sa propre exigence comme la réponse qu'il réclamait.
+#
+# Et elle n'est PAS un `↻`. Un `↻` dit si un constat tient encore ; celle-ci dit
+# ce que Maxime doit voir pour considérer la chose faite. Les confondre referait
+# le piège du 07/09, où un verdict effaçait la tâche au moment où elle devenait
+# à faire. Elle n'est donc jamais rejouée : c'est un critère pour un humain.
+FINI = re.compile(r"^\s*fini quand\s*→\s*\S", re.I | re.M)
 
 CONSTAT = re.compile(r"(?:^|(?<=\s))\?constat\b", re.I)
 # `↻ machine|service :: commande :: motif attendu`
@@ -1018,7 +1068,9 @@ def main():
                     "signature, 20 min.\n"
                     "      non → on ouvre sans encaissement, les clients paient "
                     "à la livraison.\n"
-                    "      Ça attend depuis 4 jours ; j'ai continué sur le reste.\n\n"
+                    "      fini quand → tu ouvres la boutique et un paiement d'essai "
+                "passe.\n"
+                "      Ça attend depuis 4 jours ; j'ai continué sur le reste.\n\n"
                     "UNE QUESTION FERMÉE, JAMAIS UN CONSTAT. Un constat lui laisse "
                     "tout le travail : comprendre ce qu'on lui demande, deviner "
                     "comment répondre, et mesurer seul ce qu'il risque à ne pas "
@@ -1372,6 +1424,37 @@ def main():
         except Exception:
             pass
 
+    # ── LA CIBLE DU PROJET, REJOUÉE ICI ET SERVIE PAR LE BRIEFING ──────────
+    # Le capteur et les actionneurs existaient ; la CONSIGNE manquait. Les
+    # agents réparaient ce qui casse sans jamais mesurer un écart à une cible.
+    #
+    # Rejouée ICI et pas au briefing, pour deux raisons : le budget de temps est
+    # déjà là, et le briefing tient en 15 s — y lancer une commande réseau, ce
+    # serait faire tomber le démarrage de la session pour afficher une ligne.
+    # Le verdict est donc posé en fin de tour, et relu au tour d'après. Une
+    # cible vue « telle qu'elle était il y a un tour » vaut infiniment mieux
+    # qu'un démarrage qui expire.
+    d_f = d_fact if d_fact is not None else (racine / lot / ".fact")
+    phrase, specs_cible = consigne(d_f)
+    if phrase:
+        f_cible = ETAT / ("%s.cible" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
+        verdict, jour = MUET, datetime.date.today().strftime("%d/%m")
+        for sp in specs_cible[:2]:
+            if restant <= 0:
+                break
+            t0 = time.time()
+            v, _ = rejouer(sp, restant)
+            restant -= time.time() - t0
+            # LE PIRE VERDICT GAGNE. Deux mesures dont une tombe, ce n'est pas
+            # « à moitié tenu » : c'est tombé. Une cible qui s'arrondit vers le
+            # haut ne sert plus à rien.
+            verdict = TOMBE if TOMBE in (verdict, v) else (
+                v if verdict == MUET else verdict)
+        try:
+            f_cible.write_text("%s\t%s\t%s" % (verdict, jour, phrase))
+        except Exception:
+            pass
+
     # LE CONSTAT TOMBÉ QUITTE LES RAPPELS — ET RESTE DANS LE TODO DE L'AGENT.
     # Le commanditaire ne veut pas de lignes à contrôler ; sa liste doit donc
     # raccourcir toute seule. Mais AUCUN verdict de machine ne détruit quoi que
@@ -1427,7 +1510,11 @@ def main():
                 deja[m[0]] = int(m[1]) if len(m) > 1 and m[1].isdigit() else RAPPELS_FORME
 
         def _bien_formee(t):
-            return "?" in t["titre"] and len(REPONSE.findall(t.get("corps") or "")) >= 2
+            corps = t.get("corps") or ""
+            sans_fini = FINI.sub("", corps)     # la ligne de fin ne se compte pas
+            return ("?" in t["titre"]
+                    and len(REPONSE.findall(sans_fini)) >= 2
+                    and FINI.search(corps) is not None)
 
         mauvais = [t for t in attente
                    if not _bien_formee(t)
@@ -1458,10 +1545,16 @@ def main():
                 "signature, 20 min.\n"
                 "      non → on ouvre sans encaissement, les clients paient à la "
                 "livraison.\n"
+                "      fini quand → tu ouvres la boutique et un paiement d'essai "
+                "passe.\n"
                 "      Ça attend depuis 4 jours ; j'ai continué sur le reste.\n\n"
                 "Le libellé porte la question ET les réponses possibles. Dessous, "
                 "une ligne par réponse : ce qu'elle DÉCLENCHE, pas ce qu'elle "
                 "signifie. Trois voies : numérote-les, il répond « 2 ».\n\n"
+"La dernière ligne est obligatoire : `fini quand → …`, ce que MAXIME "
+                "doit voir pour considérer la chose réglée. Pas une commande, pas "
+                "un `↻` : ce qu'il constate, lui, de son côté. Sans elle, il n'a "
+                "que ta parole.\n\n"
                 "Et si tu ne sais pas quoi faire de l'une des réponses, la question "
                 "n'est pas prête — elle n'a rien à faire dans sa liste.\n\n"
                 "Je te le redemanderai au plus une fois encore par ligne : c'est un "
