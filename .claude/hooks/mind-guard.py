@@ -65,6 +65,16 @@ def _git(args):
                           encoding="utf-8", errors="replace", timeout=15)
 
 
+# LES DEUX ÉCHAPPATOIRES SE LISENT EN FIN DE COMMANDE, PAS N'IMPORTE OÙ.
+# C'était un test de sous-chaîne brut : un nom de branche `essai-fact-ok`, un
+# chemin de fichier, une phrase du message de commit — n'importe quoi contenant
+# ces six caractères désarmait le garde, sans intention et sans trace. La prose
+# du refus disait déjà « à la fin de la commande » ; le code ne le vérifiait pas.
+# Ce que la forme exige : un `#` de commentaire shell, le mot, puis la fin.
+def _autorise(cmd, mot):
+    return re.search(r"#\s*%s\s*$" % re.escape(mot), cmd or "") is not None
+
+
 def allow():
     sys.exit(0)  # pas de sortie = décision par défaut (allow)
 
@@ -282,7 +292,7 @@ def main():
     # son lot efface ce qu'un autre y avait mis, et personne ne le voit. La
     # règle existait en prose ; ici elle devient vérifiable, et l'autorisation
     # laisse une trace dans l'historique.
-    if faits and "fact-ok" not in cmd:
+    if faits and not _autorise(cmd, "fact-ok"):
         touches = [f for f in fichiers if f.startswith(faits)]
         if touches:
             deny("mind-guard : ce commit modifie `.fact/` (%s). Ces fichiers "
@@ -295,7 +305,7 @@ def main():
 
     # `mind-ok` ne lève QUE les règles sur la déclaration de l'agent, jamais
     # celle sur `.fact/` ci-dessus. Voir le commentaire en tête de fonction.
-    if "mind-ok" in cmd:
+    if _autorise(cmd, "mind-ok"):
         allow()
 
     # 1. LISIBILITÉ — vaut même sans code, un fichier cassé est le pire cas.

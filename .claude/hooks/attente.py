@@ -43,6 +43,49 @@ import importlib.machinery, importlib.util
 
 ETAT = pathlib.Path.home() / ".claude" / "attente"
 
+# LE HARNAIS N'AVAIT AUCUN INSTRUMENT SUR LUI-MÊME. Neuf sorties bloquantes
+# tournaient tous les jours sur quatre agents, et rien n'écrivait laquelle
+# partait, quand, ni sur quoi — donc rien ne pouvait dire si le dispositif
+# servait. C'est exactement le défaut qu'il traque : un mécanisme sans trace.
+#
+# Une ligne par blocage, append-only, comme `journal.py`. Le contenu du message
+# n'y va PAS : il porte du texte venu des Rappels, donc de l'extérieur. On note
+# ce qui a mordu et sur quoi, jamais ce qui a été dit.
+JOURNAL = ETAT / "blocages.log"
+
+# Rempli par main() dès que les deux sont connus. Un blocage qui partirait avant
+# écrit « ? » plutôt que de faire tomber le hook — il est fail-open, et un
+# journal ne doit jamais être la cause d'une panne.
+_CTX = {"agent": "?", "session": "?"}
+
+
+def _journal(quoi, detail=""):
+    """Une ligne par blocage. Toute erreur est avalée : tracer ne bloque pas."""
+    try:
+        ETAT.mkdir(parents=True, exist_ok=True)
+        with JOURNAL.open("a", encoding="utf-8") as f:
+            f.write("%s\t%s\t%s\t%s\t%s\n" % (
+                datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                _CTX["agent"], quoi, str(detail)[:120], _CTX["session"]))
+    except Exception:
+        pass
+
+
+def purge_temoins(jours=7):
+    """Les témoins de SESSION ne servent qu'à leur session — ils s'accumulaient
+    sans fin (37 fichiers au 09/09). Ceux par AGENT sont cumulatifs et durables :
+    on n'y touche jamais, les effacer redonnerait leur amnistie de première
+    rencontre à `.forme` et `.carnet`, et l'arriéré repartirait."""
+    try:
+        limite = time.time() - jours * 86400
+        for f in ETAT.glob("*.*"):
+            if f.suffix in (".bloc", ".equipe", ".constat", ".tombe", ".faits") \
+               and f.stat().st_mtime < limite:
+                f.unlink()
+    except Exception:
+        pass
+
+
 # À QUI S'ADRESSE UNE DEMANDE. Le dialecte de `todo.md` écrit `@<qui>`, et le
 # gabarit du starter livre `@user`. Un atelier qui emploie un autre nom — un
 # prénom, un rôle — le déclare ici ou dans `ATTENTE_DESTINATAIRES`, séparé par
@@ -57,7 +100,10 @@ DESTINATAIRES = tuple(
     if d.strip()
 ) or ("user",)
 
-def sortie(code=0, message=None):
+def sortie(code=0, message=None, quoi=None, detail=""):
+    """L'unique canal de sortie — et donc le seul point où tracer un blocage."""
+    if code == 2 and quoi:
+        _journal(quoi, detail)
     if message:
         sys.stderr.write(message)
     sys.exit(code)
@@ -188,6 +234,13 @@ TIENT, TOMBE, MUET = "TIENT", "TOMBÉ", "MUET"
 # qu'un constat périmé. Rejouer cent fois par jour ne rend pas un constat vrai —
 # ça reproduit cent fois la même erreur avec une confiance croissante.
 CONSTAT_MAX, CONSTAT_S, CONSTAT_BUDGET = 5, 10, 25
+# Les `↻` du CARNET, rejoués sur le budget qui reste. Deux, pas plus : le budget
+# appartient d'abord aux constats qui partent chez le commanditaire.
+CARNET_MAX = 2
+
+# Combien de fois une ligne mal formée est rappelée avant qu'on la laisse. Deux :
+# borne la boucle sans laisser un défaut disparaître au premier avertissement.
+RAPPELS_FORME = 2
 
 
 def blocs_lignes(texte):
@@ -220,6 +273,51 @@ def specs_constat(texte):
     return out
 
 
+# CE QUI SORT DE CETTE MACHINE — ET CE QU'ON N'EN SAIT RIEN.
+# Le dialecte fait déclarer la SOURCE d'un contrôle — `machine` si la réponse
+# est sur ce poste, `service` si elle est chez le fournisseur — et le socle en
+# fait un point central : « une mesure locale ne répond jamais à une question
+# distante », après qu'un contrôle a décodé un cache vieux de quatre jours et
+# rendu un chiffre net, cohérent et hors sujet. Le champ était parsé et JAMAIS
+# RELU : la règle vivait en prose, et rien ne l'appliquait.
+#
+# LA PREMIÈRE VERSION DE CETTE RÈGLE ÉTAIT FAUSSE, et c'est le contrôle qui l'a
+# dit : passée sur les 34 `↻` vivants de l'atelier, elle rendait MUET NEUF
+# constats justes — un `curl` entre guillemets simples que la borne de gauche ne
+# voyait pas, un outil de secrets distant absent de la liste, un script dont on
+# ne peut rien savoir sans l'ouvrir. Écrite d'un trait et posée sans l'éprouver,
+# elle aurait cassé le quart des vérifications de Splide en silence.
+#
+# D'où la forme d'ici : on ne rend MUET que ce dont on est SÛR qu'il est local —
+# la commande commence par un inspecteur du poste et rien dedans ne sort. Tout
+# le reste — un script, un outil inconnu, une ligne de prose — échappe à la
+# règle. Un doute ne se tranche pas contre le travail de quelqu'un.
+DISTANT = re.compile(
+    r"https?://|(?<![\w-])"
+    r"(curl|wget|ssh|scp|rsync|dig|host|nslookup|nc|ncat|ping|telnet|nmap|"
+    r"gh|az|aws|gcloud|tailscale|doppler|supabase|stripe|vercel|fly|netlify|"
+    r"psql|mysql|mongosh|redis-cli|openssl|npm|pnpm|pip|op|vault)\b", re.I)
+
+# Les inspecteurs du poste : ils ne peuvent PAS répondre à une question distante.
+LOCAL = {"grep", "rg", "ls", "cat", "head", "tail", "wc", "awk", "sed", "find",
+         "stat", "file", "du", "df", "md5", "shasum", "sort", "uniq", "cut",
+         "tr", "echo", "test", "[", "ps", "pgrep", "pkill", "defaults", "diff",
+         "basename", "dirname", "readlink", "date", "id", "whoami", "uname"}
+
+
+def _sort_de_la_machine(cmd):
+    """Vrai si la commande peut atteindre l'extérieur, ou si on n'en sait rien.
+
+    Le doute compte comme « oui » : un faux MUET coûte le travail d'un agent,
+    un faux « ça sort » ne coûte qu'un contrôle imparfait de plus."""
+    cmd = cmd or ""
+    if DISTANT.search(cmd):
+        return True
+    premier = re.split(r"[\s;|&]+", cmd.strip().lstrip("(").lstrip(), 1)[0]
+    premier = premier.rsplit("/", 1)[-1]
+    return premier not in LOCAL          # inconnu ⇒ on ne tranche pas
+
+
 def rejouer(spec, budget):
     """TIENT · TOMBÉ · MUET — et jamais autre chose.
 
@@ -230,6 +328,13 @@ def rejouer(spec, budget):
     cassées."""
     if budget <= 0:
         return MUET, "budget de temps épuisé"
+    if spec.get("source") == "service" and not _sort_de_la_machine(spec.get("cmd")):
+        # PAS un refus : un MUET. La commande peut très bien être juste — mais
+        # rien dans elle ne sort d'ici, alors qu'elle prétend interroger un
+        # service. Le constat part quand même, en disant que le contrôle n'a
+        # pas abouti ; c'est à l'agent de corriger sa vérification.
+        return MUET, ("elle annonce une source distante et ne sort pas de cette "
+                      "machine — une mesure locale ne répond pas à une question distante")
     try:
         r = subprocess.run(["bash", "-c", spec["cmd"]], capture_output=True,
                            text=True, timeout=min(CONSTAT_S, budget))
@@ -784,6 +889,16 @@ def main():
     ETAT.mkdir(parents=True, exist_ok=True)
     session = re.sub(r"[^A-Za-z0-9_-]", "", str(data.get("session_id") or "x"))[:64]
 
+    # LE NOM DE L'AGENT EST RÉSOLU ICI, avant le premier blocage. Il l'était
+    # plus bas, ce qui rendait le premier blocage anonyme dans le journal. La
+    # fonction ne lit que des chemins : la remonter ne coûte rien et n'a pas
+    # d'effet de bord. L'ordre des blocs a déjà changé une fois et a coûté un
+    # NameError silencieux — vérifier par le rang de la PREMIÈRE occurrence,
+    # jamais à l'œil.
+    agent = nom_agent(racine)
+    _CTX["agent"], _CTX["session"] = agent, session
+    purge_temoins()
+
     if code:
         recent = max(p.stat().st_mtime for p in code)
         if todo.stat().st_mtime < recent:
@@ -795,7 +910,7 @@ def main():
                 pass          # déjà réclamé pour cet état — on ne coince pas
             else:
                 temoin.write_text(sig)
-                sortie(2,
+                sortie(2, quoi="B1-code-sans-todo", detail=len(code), message=
                     "attente : tu as modifié du code (%s) sans mettre "
                     "`.mind/todo.md` à jour. Ce fichier est le SEUL endroit où "
                     "le commanditaire voit ce qui lui revient — il le lit depuis son "
@@ -826,7 +941,6 @@ def main():
                     % (", ".join(p.name for p in code[:4])
                        + (", …" if len(code) > 4 else "")))
 
-    agent = nom_agent(racine)
     # UN SEUL aller-retour vers les Rappels par tour : les trois blocs qui
     # suivent lisent la même photo. Elle doit être prise ICI, avant le premier
     # qui s'en sert — l'ordre des blocs a déjà changé une fois.
@@ -848,7 +962,7 @@ def main():
                 neuves[titre] = texte
         if neuves:
             vus.write_text("\n".join(sorted(empreintes | deja)))
-            sortie(2,
+            sortie(2, quoi="B2-reponse", detail=len(neuves), message=
                 "attente : le commanditaire a RÉPONDU sur %d point(s), depuis "
                 "ses Rappels.\n\n%s\n\nApplique sa réponse. Si elle tranche la "
                 "question, coche la tâche dans `.mind/todo.md` et retire "
@@ -874,7 +988,7 @@ def main():
         neufs = [t for t in coches if t not in deja]
         if neufs:
             vus.write_text("\n".join(sorted(set(coches) | deja)))
-            sortie(2,
+            sortie(2, quoi="B3-tranche", detail=len(neufs), message=
                 "attente : Le commanditaire a tranché %d point(s) depuis ses Rappels.\n\n%s\n\n"
                 "Ouvre le rappel pour lire sa réponse s'il en a écrit une dans le "
                 "corps, applique la décision, puis coche la tâche correspondante "
@@ -893,7 +1007,7 @@ def main():
         neuves = [d for d in demandes if d not in deja]
         if neuves:
             vus.write_text("\n".join(sorted(set(demandes) | deja)))
-            sortie(2,
+            sortie(2, quoi="B4-demande", detail=len(neuves), message=
                 "attente : Le commanditaire t'a écrit %d demande(s) dans tes Rappels.\n\n%s\n\n"
                 "Ouvre le rappel : le corps peut porter le détail. Traite-la, ou "
                 "porte-la dans `.mind/todo.md` si elle demande du temps — puis "
@@ -937,7 +1051,7 @@ def main():
                 temoin = ETAT / ("%s.equipe" % session)
                 if not (temoin.exists() and temoin.read_text().strip() == sig):
                     temoin.write_text(sig)
-                    sortie(2,
+                    sortie(2, quoi="B5-carnet", detail=len(touches), message=
                         "attente : tu viens de commiter dans une zone que "
                         "d'autres agents lisent ou importent (%s), sans rien "
                         "verser au carnet d'équipe.\n\n"
@@ -999,7 +1113,7 @@ def main():
                 temoin = ETAT / ("%s.faits" % session)
                 if not (temoin.exists() and temoin.read_text().strip() == sig):
                     temoin.write_text(sig)
-                    sortie(2,
+                    sortie(2, quoi="B6-faits", detail=len(faits_touches), message=
                         "attente : tu as modifié les FAITS du projet (%s). Ce "
                         "sont les seuls fichiers partagés par tous les agents, "
                         "et ils ne s'écrivent qu'à la demande du "
@@ -1067,7 +1181,7 @@ def main():
         temoin = ETAT / ("%s.constat" % session)
         if not (temoin.exists() and temoin.read_text().strip() == sig):
             temoin.write_text(sig)
-            sortie(2,
+            sortie(2, quoi="B7-constat-sans-rejeu", detail=len(manquants), message=
                 "attente : %d constat(s) sans moyen d'être rouvert(s) : %s.\n\n"
                 "Un constat n'est pas une tâche. « Construire X » reste vrai "
                 "jusqu'à ce que tu le fasses ; « X manque » peut cesser d'être "
@@ -1086,6 +1200,20 @@ def main():
                 "Si une ligne est une tâche et non un constat, retire `?constat`."
                 % (len(manquants), ", ".join(t["titre"][:40] for t in manquants[:3])))
 
+    # UN SEUL CONTRÔLE EN ÉCHEC NE SUFFIT PLUS À SORTIR UNE LIGNE DE SA VUE.
+    # Rien n'était détruit — le constat restait dans le todo — mais il quittait
+    # les Rappels du commanditaire sur UNE vérification ratée, et c'est la seule
+    # surface qu'il lit. Or une vérification se trompe : réseau lent, jeton
+    # expiré, service qui limite le débit. Le premier échec annote et garde ; le
+    # second, consécutif, retire. Un TIENT ou un MUET remet le compteur à zéro —
+    # « consécutif » veut dire consécutif.
+    ftombes = ETAT / ("%s.tombes" % re.sub(r"[^A-Za-z0-9_-]", "-", agent))
+    try:
+        tombes_vus = set(ftombes.read_text().split())
+    except Exception:
+        tombes_vus = set()
+    tombes_apres = set(tombes_vus)
+
     tombes, restant = [], CONSTAT_BUDGET
     for t in [x for x in attente if x["_i"] < len(specs) and specs[x["_i"]]
               and not specs[x["_i"]].get("sans")][:CONSTAT_MAX]:
@@ -1093,15 +1221,54 @@ def main():
         verdict, raison = rejouer(specs[t["_i"]], restant)
         restant -= time.time() - t0
         jour = datetime.date.today().strftime("%d/%m")
+        h = hashlib.sha1(t["titre"].encode("utf-8", "replace")).hexdigest()[:12]
         if verdict == TIENT:
             t["corps"] = (t.get("corps") or "") + " · reconfirmé le %s" % jour
+            tombes_apres.discard(h)
         elif verdict == MUET:
             # JAMAIS lu comme une confirmation : le constat part quand même, en
             # disant que la vérification n'a pas abouti.
             t["corps"] = (t.get("corps") or "") + " · le %s, %s" % (jour, raison)
-        else:
-            t["_tombe"] = True
+            tombes_apres.discard(h)
+        elif h in tombes_vus:
+            t["_tombe"] = True                       # deuxième échec de suite
             tombes.append(t["titre"])
+            tombes_apres.discard(h)
+        else:
+            t["corps"] = ((t.get("corps") or "")
+                          + " · le %s, sa vérification a échoué une première fois" % jour)
+            tombes_apres.add(h)
+
+    # ── LE CARNET AUSSI A DES `↻`, ET PERSONNE NE LES REJOUAIT ─────────────
+    # `carnet.replancher()` porte EFFONDRE (un constat démenti perd la moitié de
+    # sa confiance) et la restauration au plancher de niveau sur TIENT. Le code
+    # existait depuis le début — SANS AUCUN APPELANT. Les `↻` des entrées de
+    # carnet étaient parsés (`carnet.entrees`, champ `rejeu`) et jamais exécutés.
+    # Résultat : la confiance ne pouvait que s'éroder, jamais se refaire par une
+    # mesure — c'est-à-dire exactement l'inverse de ce que sa docstring promet.
+    #
+    # Trois bornes, parce que ça coûte du temps réel dans un hook à 40 s :
+    #  · au plus CARNET_MAX entrées par tour, les plus récentes d'abord ;
+    #  · sur le budget QUI RESTE après les constats du todo, jamais en plus ;
+    #  · jamais deux fois le même jour (`vu`), sinon une entrée monopoliserait.
+    # Et ça ne bloque JAMAIS : un rejeu de carnet informe la confiance, il ne
+    # renvoie pas l'agent au travail.
+    if esp is not None and k is not None and restant > 0:
+        try:
+            conf = k.confiances(esp)
+            aujourdhui = datetime.date.today().isoformat()
+            candidats = [e for e in k.entrees(esp)
+                         if e.get("rejeu") and e["id"] in conf
+                         and conf[e["id"]].get("vu") != aujourdhui][:CARNET_MAX]
+            for e in candidats:
+                if restant <= 0:
+                    break
+                t0 = time.time()
+                verdict, _ = rejouer(e["rejeu"], restant)
+                restant -= time.time() - t0
+                k.replancher(esp, e["id"], verdict)
+        except Exception:
+            pass
 
     # LE CONSTAT TOMBÉ QUITTE LES RAPPELS — ET RESTE DANS LE TODO DE L'AGENT.
     # Le commanditaire ne veut pas de lignes à contrôler ; sa liste doit donc
@@ -1110,6 +1277,10 @@ def main():
     # silence, et un contrôle dont l'échec ressemble au succès est précisément
     # la panne que tout ce dispositif traque. L'agent tranche, au tour suivant.
     attente = [t for t in attente if not t.get("_tombe")]
+    try:
+        ftombes.write_text("\n".join(sorted(tombes_apres)))
+    except Exception:
+        pass
 
     # --- 2 ter. LA FORME : une question, jamais un constat -------------------
     # Le hook connaît la forme mieux qu'un texte de socle : il lit ces lignes à
@@ -1132,19 +1303,47 @@ def main():
         # qu'on finit par désarmer — la leçon du faux positif du 05/09.
         vus_f.write_text("\n".join(sorted(empreintes)))
     else:
-        deja = set(vus_f.read_text().split())
+        # LE TÉMOIN S'ARME SUR LE RÉSULTAT, PLUS SUR L'ACTION. Il était écrit
+        # inconditionnellement, AVANT le message : une ligne mal formée était
+        # signalée une fois puis oubliée à VIE, et le témoin annonçait donc
+        # comme traité ce qu'il venait d'empêcher de vérifier. Même défaut que
+        # le frein d'une heure du réveil, qui a transformé un échec transitoire
+        # en panne durable le 09/09 — un garde anti-répétition s'arme sur le
+        # RÉSULTAT, jamais sur l'action.
+        #
+        # Deux rappels par ligne, pas un, pas l'infini : un seul laissait passer
+        # tout ce qui n'était pas corrigé du premier coup ; sans borne, un hook
+        # peut coincer un agent, et aucun dispositif ne doit pouvoir faire ça.
+        #
+        # ANCIEN FORMAT : une empreinte nue par ligne. Elle vaut « déjà
+        # avertie », donc épuisée — l'arriéré garde le comportement d'hier et la
+        # règle neuve ne s'applique qu'à partir d'ici.
+        deja = {}
+        for l in vus_f.read_text().split("\n"):
+            m = l.split()
+            if m:
+                deja[m[0]] = int(m[1]) if len(m) > 1 and m[1].isdigit() else RAPPELS_FORME
+
+        def _bien_formee(t):
+            return "?" in t["titre"] and len(REPONSE.findall(t.get("corps") or "")) >= 2
+
         mauvais = [t for t in attente
-                   if hashlib.sha1(t["titre"].encode("utf-8", "replace")).hexdigest()[:12]
-                   not in deja
-                   and not ("?" in t["titre"]
-                            and len(REPONSE.findall(t.get("corps") or "")) >= 2)]
-        # ON N'AVERTIT QU'UNE FOIS PAR LIGNE, comme les rappels tranchés plus
-        # haut : la ligne rejoint les vues même si elle est mal formée. Un hook
-        # qui redemande à chaque tour finit par coincer l'agent, et aucun
-        # dispositif ne doit pouvoir faire ça.
-        vus_f.write_text("\n".join(sorted(deja | empreintes)))
+                   if not _bien_formee(t)
+                   and deja.get(hashlib.sha1(t["titre"].encode("utf-8", "replace"))
+                                .hexdigest()[:12], 0) < RAPPELS_FORME]
+        # Une ligne CORRIGÉE est classée : on ne la recomptera jamais. Une ligne
+        # encore mauvaise voit son compteur monter — et rien d'autre ne bouge.
+        h_mauvais = {hashlib.sha1(t["titre"].encode("utf-8", "replace")).hexdigest()[:12]
+                     for t in mauvais}
+        for t in attente:
+            h = hashlib.sha1(t["titre"].encode("utf-8", "replace")).hexdigest()[:12]
+            if _bien_formee(t):
+                deja[h] = RAPPELS_FORME
+            elif h in h_mauvais:
+                deja[h] = deja.get(h, 0) + 1
+        vus_f.write_text("\n".join("%s %d" % (h, n) for h, n in sorted(deja.items())))
         if mauvais:
-            sortie(2,
+            sortie(2, quoi="B8-forme", detail=len(mauvais), message=
                 "attente : %d ligne(s) qui attend(ent) le commanditaire sont écrites "
                 "comme des CONSTATS, pas comme des questions : %s.\n\n"
                 "Un constat lui laisse tout le travail — comprendre ce qu'on lui "
@@ -1163,7 +1362,7 @@ def main():
                 "signifie. Trois voies : numérote-les, il répond « 2 ».\n\n"
                 "Et si tu ne sais pas quoi faire de l'une des réponses, la question "
                 "n'est pas prête — elle n'a rien à faire dans sa liste.\n\n"
-                "Je ne te le redemanderai pas pour ces lignes-là : c'est un "
+                "Je te le redemanderai au plus une fois encore par ligne : c'est un "
                 "avertissement, pas un blocage permanent."
                 % (len(mauvais),
                    ", ".join("« %s »" % t["titre"][:50] for t in mauvais[:3])
@@ -1289,9 +1488,12 @@ def main():
         temoin = ETAT / ("%s.tombe" % session)
         if not (temoin.exists() and temoin.read_text().strip() == sig):
             temoin.write_text(sig)
-            sortie(2,
+            sortie(2, quoi="B9-tombe", detail=len(tombes), message=
                 "attente : %d constat(s) ne tiennent plus — leur propre "
-                "vérification dit le contraire :\n\n%s\n\n"
+                "vérification dit le contraire, DEUX FOIS DE SUITE :\n\n%s\n\n"
+                "Un premier échec les avait seulement annotés : une vérification "
+                "rate aussi pour de mauvaises raisons — réseau, jeton, débit "
+                "limité. Deux d'affilée, c'est autre chose.\n\n"
                 "Ils viennent de quitter les Rappels du commanditaire, pour qu'il "
                 "n'ait pas à contrôler des lignes fausses. Ils sont TOUJOURS dans "
                 "`.mind/todo.md` : rien n'a été détruit, parce qu'une vérification "
