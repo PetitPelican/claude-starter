@@ -73,6 +73,16 @@ pièges, sur ce poste, encore et encore.
   chiffres faux le même jour en sont sortis. Et **un nom est une adresse avant
   d'être un titre** : cinq points du poste rangent par chemin, un renommage
   déplace en silence ce qui s'y trouve.
+- **Ton essai peut-il seulement échouer ?** Un garde `PreToolUse` part AVANT la
+  commande et depuis le dossier de l'AGENT : préparer le cas et le déclencher
+  dans le même appel ne teste rien — au moment où il regarde, la préparation
+  n'a pas eu lieu — et un `cd` dans la commande ne le déplace pas. Les deux
+  erreurs rendent « autorisé », c'est-à-dire exactement ce que rend un garde
+  absent. Poser le cas dans un appel, le déclencher dans le suivant, et exiger
+  le témoin négatif dans la foulée. **Et trois échecs identiques ne sont pas
+  une confirmation** : c'est un même défaut d'instrument joué trois fois. Avant
+  d'écrire « ce mécanisme est cassé depuis N jours », refaire la mesure
+  AUTREMENT — pas une quatrième fois pareil.
 - **Corriges-tu la SOURCE, ou la copie que tu es en train de lire ?** Éditer un
   fichier déployé — un cache, un clone de marché, une copie de hook — paraît
   plus direct et fabrique une branche privée que plus rien ne peut avancer : le
