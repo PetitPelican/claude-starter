@@ -12,10 +12,12 @@ pièges, sur ce poste, encore et encore.
 - **Ton instrument a-t-il répondu à LA question posée, ou à une plus petite ?**
   « ça marche ICI » ne répond pas à « ça marche LÀ-BAS ». Vingt-trois fois.
   **Et quand tu construis l'instrument toi-même : par combien de chemins la
-  chose arrive-t-elle, et combien en vois-tu ?** Un compteur qui n'observe
-  qu'une des deux portes rend un plancher, jamais un total — et ce qu'il ne voit
-  pas passe pour inexistant. Dis-le DANS le rapport, sinon le chiffre a l'air
-  juste.
+  chose arrive-t-elle, et combien en vois-tu ?** Ce qu'un compteur ne voit pas
+  passe pour inexistant — dis-le DANS le rapport, sinon le chiffre a l'air
+  juste. **Mais COMPTE les chemins, ne les suppose pas** : le 09/09 j'ai annoncé
+  qu'un compteur ne voyait « qu'une porte sur deux », puis mesuré qu'il n'y en
+  avait qu'une. Un plancher annoncé sans preuve est une erreur au même titre
+  qu'un total annoncé sans preuve — il a juste l'air prudent.
 - **Le chiffre que tu lis mesure-t-il ce que tu crois ?** `unused` n'est pas la
   mémoire libre ; un cache n'est pas le service ; un dépôt n'est pas l'arbre
   qu'une commande a lu.

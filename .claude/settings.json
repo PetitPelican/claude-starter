@@ -15,78 +15,15 @@
       "Bash(rtk git push*)"
     ]
   },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
-            "timeout": 15,
-            "statusMessage": "briefing (.mind)"
-          }
-        ]
+  "extraKnownMarketplaces": {
+    "atelier": {
+      "source": {
+        "source": "github",
+        "repo": "PetitPelican/claude-harnais"
       }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/briefing.py\"",
-            "timeout": 15,
-            "statusMessage": "briefing si .mind a changé"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/mind-guard.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/mind-guard.py\"",
-            "timeout": 20,
-            "statusMessage": "mind-guard (le script filtre lui-même)"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/journal.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/journal.py\"",
-            "timeout": 20,
-            "statusMessage": "journal (le script filtre lui-même)"
-          }
-        ]
-      },
-      {
-        "matcher": "Read",
-        "hooks": [
-          {
-            "type": "command",
-            "timeout": 5,
-            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/memoire-usage.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/memoire-usage.py\""
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/attente.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/attente.py\"",
-            "timeout": 40,
-            "statusMessage": "attente (ce qui revient au commanditaire)"
-          }
-        ]
-      }
-    ]
+    }
+  },
+  "enabledPlugins": {
+    "harnais@atelier": true
   }
 }

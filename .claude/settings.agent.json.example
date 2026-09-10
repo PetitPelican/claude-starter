@@ -17,93 +17,17 @@
     ],
     "_note_perimetre": "Le périmètre d'un agent s'écrit ICI, en `deny`, et NULLE PART AILLEURS — une consigne en prose dans son CLAUDE.md n'empêche rien. Trois faits mesurés le 04/09/2026, à ne pas redécouvrir : (1) seules les règles `Edit(...)` sont évaluées, `Write(...)` est inerte et provoque un avertissement au démarrage ; (2) un motif RELATIF (`Edit(../autre/**)`) ne mord pas — vérifié, le fichier a été modifié malgré la règle ; (3) un motif ancré sur le home (`Edit(~/Agentic/<Projet>/agents/<autre>/**)`) mord, y compris hors du dossier courant et en mode bypassPermissions. Écrire donc TOUJOURS des chemins `~/`-ancrés, jamais de `../`."
   },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/briefing.py\"",
-            "timeout": 15,
-            "statusMessage": "briefing (.mind) [python]"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/briefing.py\"",
-            "timeout": 15,
-            "statusMessage": "briefing (.mind) [python3]"
-          }
-        ]
+  "extraKnownMarketplaces": {
+    "atelier": {
+      "source": {
+        "source": "github",
+        "repo": "PetitPelican/claude-harnais"
       }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/briefing.py\"",
-            "timeout": 15,
-            "statusMessage": "briefing si .mind a changé [python]"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/briefing.py\"",
-            "timeout": 15,
-            "statusMessage": "briefing si .mind a changé [python3]"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/mind-guard.py\"",
-            "timeout": 20,
-            "statusMessage": "mind-guard (le script filtre lui-même) [python]"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/mind-guard.py\"",
-            "timeout": 20,
-            "statusMessage": "mind-guard (le script filtre lui-même) [python3]"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/journal.py\"",
-            "timeout": 20,
-            "statusMessage": "journal (le script filtre lui-même) [python]"
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/journal.py\"",
-            "timeout": 20,
-            "statusMessage": "journal (le script filtre lui-même) [python3]"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v python3 >/dev/null 2>&1 && exec python3 \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/attente.py\" || exec python \"${CLAUDE_PROJECT_DIR:-.}/../../.claude/hooks/attente.py\"",
-            "timeout": 40,
-            "statusMessage": "attente (ce qui revient au commanditaire)"
-          }
-        ]
-      }
-    ],
-    "_note_stop": "NE PAS RETIRER CE HOOK, et le poser sur CHAQUE agent. Sans lui, l'agent ne remonte RIEN au commanditaire — et rien ne le signale, `attente.py` étant fail-open par conception. Ce modèle a livré des agents muets tant que `Stop` y manquait : les quatre autres hooks tournaient, le harnais avait l'air complet, et les demandes s'accumulaient dans `.mind/todo.md` sans jamais atteindre personne. Contrairement aux quatre autres entrées, celle-ci n'est PAS dédoublée en `python`/`python3` : un seul appel avec repli, parce qu'un double appel pousserait deux fois vers le canal du commanditaire."
-  }
+    }
+  },
+  "enabledPlugins": {
+    "harnais@atelier": true
+  },
+  "_note_hooks": "IL N'Y A PLUS DE BLOC `hooks` ICI, ET C'EST VOULU — depuis le 10/09/2026. Les sept hooks viennent du paquet `harnais@atelier`, par un chemin absolu que l'outil fournit lui-même. Ce que ça supprime, mesuré : (1) le repointage `../../` de chaque commande, qui devait être refait à chaque agent créé ; (2) la panne muette d'un clone Windows, qui transforme un lien symbolique en fichier texte et fait disparaître les hooks sans un mot ; (3) la dérive silencieuse — ce modèle a livré des agents branchés sur une copie de `briefing.py` en retard de 321 lignes, sans que rien ne le dise, parce qu'un chemin relatif ne porte aucune version. Le paquet, lui, en porte une.",
+  "_note_stop": "SI TU REMETS UN BLOC `hooks` UN JOUR, `Stop` DOIT EN FAIRE PARTIE. Sans lui, l'agent ne remonte RIEN au commanditaire — et rien ne le signale, le hook de fin de tour étant fail-open par conception. Ce modèle a livré des agents muets tant que `Stop` y manquait : les quatre autres hooks tournaient, le harnais avait l'air complet, et les demandes s'accumulaient dans `.mind/todo.md` sans jamais atteindre personne. Le cas s'est reproduit hors de ce modèle : au 10/09/2026, `Splide QA` a perdu son `Stop` en étant recâblé à la main, et sa mémoire n'a jamais été enregistrée automatiquement depuis. Le paquet ferme cette porte — il déclare les sept ensemble, on n'en oublie plus un."
 }
