@@ -21,9 +21,16 @@ pièges, sur ce poste, encore et encore.
 - **Le chiffre que tu lis mesure-t-il ce que tu crois ?** `unused` n'est pas la
   mémoire libre ; un cache n'est pas le service ; un dépôt n'est pas l'arbre
   qu'une commande a lu.
-- **Ton contrôle est-il écrit dans le MÊME SENS que ton constat ?** Une ligne
-  qui dit « ça manque » et une vérification qui demande « est-ce là » rendent
-  TOMBÉ tant que le travail reste à faire.
+- **Ton contrôle est-il écrit dans le MÊME SENS que ton constat — et
+  teste-t-il ce que le constat AFFIRME ?** Une ligne qui dit « ça manque » et
+  une vérification qui demande « est-ce là » rendent TOMBÉ tant que le travail
+  reste à faire. **Et une vérification épinglée sur un CHIFFRE EXACT tombe au
+  premier enregistrement de qui que ce soit — le tien compris** : le 10/09 j'ai
+  fait tomber mon propre constat en enregistrant chez les projets dont il
+  parlait, et il exigeait « six ». Le chiffre est un décor, la revendication est
+  « il en reste » : vérifie ça, jamais le décor. C'est la règle du bas — *l'as-tu
+  périmé toi-même en travaillant ?* — et c'est la forme qui l'attrape le plus
+  souvent.
 - **Un tube n'a-t-il pas avalé le code de sortie de ce qui t'intéressait ?**
   `cmd --exit-status | tail` rend le succès de `tail`. Le pire est
   `| grep motif | tail` : l'échec de `grep` EST l'information.
