@@ -34,11 +34,26 @@ pièges, sur ce poste, encore et encore.
 - **Un tube n'a-t-il pas avalé le code de sortie de ce qui t'intéressait ?**
   `cmd --exit-status | tail` rend le succès de `tail`. Le pire est
   `| grep motif | tail` : l'échec de `grep` EST l'information.
+- **Interroges-tu le chemin qui SERT, ou celui que tu as reconstruit ?** Un
+  outil qui recompose l'adresse au lieu de la demander ne sait voir qu'une
+  forme, et crie « absent » sur les autres. Le 10/09 mon propre diagnostic a
+  fait annuler une bascule qui marchait, pendant que le harnais servait l'état
+  complet à la même seconde.
+- **Ton cas limite ressemble-t-il au cas nominal ?** Formulé par l'agent
+  d'exploitation de Splide : *un cas limite qui ressemble au cas nominal
+  court-circuite le garde qui l'attendait*. Le garde du gabarit existait — il
+  testait « la liste est-elle vide », et elle contenait un décor.
 - **« Rien vu » : vérifié bon, vérifié mauvais, ou pas mesuré ?** Les trois se
   ressemblent en sortie et ne veulent pas dire la même chose.
 - **« Envoyé » n'est pas « arrivé ».** As-tu la preuve du côté qui reçoit ?
 - **Ce fait, l'as-tu périmé toi-même en travaillant ?** L'âge n'est pas le seul
   déclencheur : « je viens de changer ce dont ce fait parle » en est un.
+- **Ta référence a-t-elle été rafraîchie, ou compares-tu un instantané au
+  présent ?** « Propre » ne veut pas dire « à jour » : le 10/09 j'ai lu le bon
+  fichier, dans le bon arbre, **à la mauvaise date** — l'arbre n'avait aucune
+  modification en attente et accusait 38 enregistrements de retard. Rien
+  d'anormal à voir, c'est ce qui rend le piège invisible. Rafraîchir AVANT de
+  comparer deux branches, sinon la divergence qu'on mesure est la sienne.
 
 ## Sur cette machine
 
@@ -58,6 +73,23 @@ pièges, sur ce poste, encore et encore.
   chiffres faux le même jour en sont sortis. Et **un nom est une adresse avant
   d'être un titre** : cinq points du poste rangent par chemin, un renommage
   déplace en silence ce qui s'y trouve.
+- **Corriges-tu la SOURCE, ou la copie que tu es en train de lire ?** Éditer un
+  fichier déployé — un cache, un clone de marché, une copie de hook — paraît
+  plus direct et fabrique une branche privée que plus rien ne peut avancer : le
+  `git pull` suivant est refusé, et **rien en aval ne dit qu'il a été refusé**.
+  L'outil qui installe rend « déjà à jour », ce qui est vrai de sa copie. La
+  chaîne a quatre maillons — dépôt, marché, cache, session — et chacun retient
+  pour une raison différente : un numéro pour le premier, l'état de l'arbre
+  pour le deuxième, un redémarrage pour le dernier. Quand une correction
+  publiée « n'arrive pas », remonter les quatre dans l'ordre au lieu de
+  republier.
+- **Ce préfixe, ce nom, ce chemin — l'as-tu demandé, ou recomposé ?** Un chemin
+  écrit en dur est juste le jour où on l'écrit et faux le jour où l'arbre
+  bouge, sans qu'aucune exécution ne le signale : un briefing qui nomme le
+  mauvais dossier et un garde qui cherche un fichier absent rendent exactement
+  ce que rend leur version juste — rien. Trois l'ont fait le même jour. Demande
+  le chemin à ce qui le décide ; un affichage se DÉRIVE du disque, il ne se
+  réécrit pas.
 - **Mécanismes — celui-ci a-t-il un appelant, et son déclencheur se produit-il
   vraiment ?** Une étiquette que l'agent doit poser lui-même ne se pose jamais
   — `échoué` existe depuis le début du carnet, zéro entrée sur vingt la porte.
